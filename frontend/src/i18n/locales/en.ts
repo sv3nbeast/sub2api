@@ -5953,9 +5953,15 @@ const baseMessages = {
         conditionType: 'Condition type',
         conditionSubscription: 'Subscription',
         conditionBalance: 'Balance',
+        conditionUser: 'Specific users',
         operator: 'Operator',
         balanceValue: 'Balance threshold',
-        selectPackages: 'Select packages'
+        selectPackages: 'Select packages',
+        selectUsers: 'Select users',
+        searchUsers: 'Search',
+        searchUsersByEmail: 'Enter an email to search',
+        noUsersFound: 'No matching users found',
+        removeUser: 'Remove user'
       },
       operators: {
         gt: '>',

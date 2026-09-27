@@ -111,6 +111,75 @@
                 />
               </div>
 
+              <div v-else-if="cond.type === 'user'" class="flex-1">
+                <label class="input-label">{{ t('admin.announcements.form.selectUsers') }}</label>
+                <div class="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    v-model="userTargetState(groupIndex, condIndex).query"
+                    type="search"
+                    class="input flex-1"
+                    :placeholder="t('admin.announcements.form.searchUsersByEmail')"
+                    @keydown.enter.prevent="searchTargetUsers(groupIndex, condIndex)"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-secondary shrink-0"
+                    :disabled="userTargetState(groupIndex, condIndex).loading"
+                    @click="searchTargetUsers(groupIndex, condIndex)"
+                  >
+                    <Icon
+                      name="search"
+                      size="sm"
+                      class="mr-1"
+                      :class="userTargetState(groupIndex, condIndex).loading ? 'animate-spin' : ''"
+                    />
+                    {{ t('admin.announcements.form.searchUsers') }}
+                  </button>
+                </div>
+
+                <div
+                  v-if="userTargetState(groupIndex, condIndex).searched"
+                  class="mt-2 rounded-lg border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-900"
+                >
+                  <div
+                    v-if="userTargetState(groupIndex, condIndex).results.length === 0"
+                    class="px-3 py-2 text-xs text-gray-500 dark:text-dark-400"
+                  >
+                    {{ t('admin.announcements.form.noUsersFound') }}
+                  </div>
+                  <button
+                    v-for="user in userTargetState(groupIndex, condIndex).results"
+                    :key="user.id"
+                    type="button"
+                    class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-50 dark:hover:bg-dark-800"
+                    :class="isUserSelected(cond, user.id) ? 'opacity-50' : ''"
+                    :disabled="isUserSelected(cond, user.id)"
+                    @click="addUserTarget(groupIndex, condIndex, user.id)"
+                  >
+                    <span class="min-w-0 truncate text-gray-900 dark:text-white">{{ user.email }}</span>
+                    <span class="shrink-0 text-xs text-gray-500 dark:text-dark-400">#{{ user.id }}</span>
+                  </button>
+                </div>
+
+                <div v-if="(cond.user_ids || []).length > 0" class="mt-2 flex flex-wrap gap-2">
+                  <span
+                    v-for="userId in cond.user_ids"
+                    :key="userId"
+                    class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                  >
+                    {{ selectedUserLabel(groupIndex, condIndex, userId) }}
+                    <button
+                      type="button"
+                      class="rounded-full p-0.5 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                      :aria-label="t('admin.announcements.form.removeUser')"
+                      @click="removeUserTarget(groupIndex, condIndex, userId)"
+                    >
+                      <Icon name="x" size="xs" />
+                    </button>
+                  </span>
+                </div>
+              </div>
+
               <div v-else class="flex flex-1 flex-col gap-3 sm:flex-row">
                 <div class="w-full sm:w-44">
                   <label class="input-label">{{ t('admin.announcements.form.operator') }}</label>
@@ -169,6 +238,8 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { adminAPI } from '@/api/admin'
+import type { SimpleUser } from '@/api/admin/usage'
 import type {
   AdminGroup,
   AnnouncementTargeting,
@@ -200,7 +271,8 @@ const mode = computed<Mode>(() => (anyOf.value.length === 0 ? 'all' : 'custom'))
 
 const conditionTypeOptions = computed(() => [
   { value: 'subscription', label: t('admin.announcements.form.conditionSubscription') },
-  { value: 'balance', label: t('admin.announcements.form.conditionBalance') }
+  { value: 'balance', label: t('admin.announcements.form.conditionBalance') },
+  { value: 'user', label: t('admin.announcements.form.conditionUser') }
 ])
 
 const balanceOperatorOptions = computed(() => [
@@ -234,6 +306,14 @@ function defaultBalanceCondition(): AnnouncementCondition {
     type: 'balance' as AnnouncementConditionType,
     operator: 'gte' as AnnouncementOperator,
     value: 0
+  }
+}
+
+function defaultUserCondition(): AnnouncementCondition {
+  return {
+    type: 'user' as AnnouncementConditionType,
+    operator: 'in' as AnnouncementOperator,
+    user_ids: []
   }
 }
 
@@ -285,6 +365,8 @@ function setConditionType(groupIndex: number, condIndex: number, nextType: Annou
 
     if (nextType === 'subscription') {
       group.all_of[condIndex] = defaultSubscriptionCondition()
+    } else if (nextType === 'user') {
+      group.all_of[condIndex] = defaultUserCondition()
     } else {
       group.all_of[condIndex] = defaultBalanceCondition()
     }
@@ -313,6 +395,79 @@ function setBalanceValue(groupIndex: number, condIndex: number, raw: string) {
     if (!cond) return
 
     cond.value = Number.isFinite(n) ? n : 0
+  })
+}
+
+type UserTargetState = {
+  query: string
+  results: SimpleUser[]
+  loading: boolean
+  searched: boolean
+}
+
+const userTargetStates = reactive<Record<string, UserTargetState>>({})
+
+function userStateKey(groupIndex: number, condIndex: number) {
+  return `${groupIndex}:${condIndex}`
+}
+
+function ensureUserStatePath(groupIndex: number, condIndex: number) {
+  const key = userStateKey(groupIndex, condIndex)
+  if (!userTargetStates[key]) {
+    userTargetStates[key] = { query: '', results: [], loading: false, searched: false }
+  }
+  return userTargetStates[key]
+}
+
+function userTargetState(groupIndex: number, condIndex: number) {
+  return ensureUserStatePath(groupIndex, condIndex)
+}
+
+async function searchTargetUsers(groupIndex: number, condIndex: number) {
+  const state = ensureUserStatePath(groupIndex, condIndex)
+  const query = state.query.trim()
+  if (query.length < 2) {
+    state.results = []
+    state.searched = true
+    return
+  }
+
+  state.loading = true
+  state.searched = false
+  try {
+    const results = await adminAPI.usage.searchUsers(query)
+    state.results = results.filter((user) => !user.deleted)
+  } catch (error) {
+    console.error('Failed to search announcement users:', error)
+    state.results = []
+  } finally {
+    state.loading = false
+    state.searched = true
+  }
+}
+
+function isUserSelected(cond: AnnouncementCondition, userId: number) {
+  return (cond.user_ids ?? []).includes(userId)
+}
+
+function selectedUserLabel(groupIndex: number, condIndex: number, userId: number) {
+  const user = userTargetState(groupIndex, condIndex).results.find((item) => item.id === userId)
+  return user?.email ?? `#${userId}`
+}
+
+function addUserTarget(groupIndex: number, condIndex: number, userId: number) {
+  updateTargeting((draft) => {
+    const condition = draft.any_of[groupIndex]?.all_of?.[condIndex]
+    if (!condition || condition.type !== 'user') return
+    condition.user_ids = Array.from(new Set([...(condition.user_ids ?? []), userId]))
+  })
+}
+
+function removeUserTarget(groupIndex: number, condIndex: number, userId: number) {
+  updateTargeting((draft) => {
+    const condition = draft.any_of[groupIndex]?.all_of?.[condIndex]
+    if (!condition || condition.type !== 'user') return
+    condition.user_ids = (condition.user_ids ?? []).filter((id) => id !== userId)
   })
 }
 
@@ -401,6 +556,8 @@ const validationError = computed(() => {
     for (const c of allOf) {
       if (c.type === 'subscription') {
         if (!c.group_ids || c.group_ids.length === 0) return t('admin.announcements.form.selectPackages')
+      } else if (c.type === 'user') {
+        if (!c.user_ids || c.user_ids.length === 0) return t('admin.announcements.form.selectUsers')
       }
     }
   }

@@ -547,6 +547,12 @@ async function handleSave() {
       appStore.showError(t('admin.announcements.failedToCreate'))
       return
     }
+    for (const condition of allOf) {
+      if (condition.type === 'user' && (!condition.user_ids || condition.user_ids.length === 0)) {
+        appStore.showError(t('admin.announcements.form.selectUsers'))
+        return
+      }
+    }
   }
 
   saving.value = true

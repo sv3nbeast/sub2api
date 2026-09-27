@@ -5940,9 +5940,15 @@ const baseMessages = {
         conditionType: '条件类型',
         conditionSubscription: '订阅套餐',
         conditionBalance: '余额',
+        conditionUser: '指定用户',
         operator: '运算符',
         balanceValue: '余额阈值',
-        selectPackages: '选择套餐'
+        selectPackages: '选择套餐',
+        selectUsers: '选择用户',
+        searchUsers: '搜索',
+        searchUsersByEmail: '输入邮箱后搜索',
+        noUsersFound: '未找到匹配用户',
+        removeUser: '移除用户'
       },
       operators: {
         gt: '>',

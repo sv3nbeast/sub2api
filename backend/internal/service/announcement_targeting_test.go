@@ -12,6 +12,39 @@ func TestAnnouncementTargeting_Matches_EmptyMatchesAll(t *testing.T) {
 	require.True(t, targeting.Matches(123.45, map[int64]struct{}{1: {}}))
 }
 
+func TestAnnouncementTargeting_UserTargetIsExactAndNeverPublic(t *testing.T) {
+	targeting := AnnouncementTargeting{
+		AnyOf: []AnnouncementConditionGroup{
+			{AllOf: []AnnouncementCondition{
+				{
+					Type:     AnnouncementConditionTypeUser,
+					Operator: AnnouncementOperatorIn,
+					UserIDs:  []int64{859},
+				},
+			}},
+		},
+	}
+
+	require.True(t, targeting.MatchesForUser(859, 0, nil))
+	require.False(t, targeting.MatchesForUser(860, 0, nil))
+	require.False(t, targeting.Matches(0, nil))
+}
+
+func TestAnnouncementTargeting_UserTargetValidation(t *testing.T) {
+	targeting := AnnouncementTargeting{
+		AnyOf: []AnnouncementConditionGroup{
+			{AllOf: []AnnouncementCondition{
+				{
+					Type:     AnnouncementConditionTypeUser,
+					Operator: AnnouncementOperatorIn,
+				},
+			}},
+		},
+	}
+	_, err := targeting.NormalizeAndValidate()
+	require.ErrorIs(t, err, ErrAnnouncementInvalidTarget)
+}
+
 func TestAnnouncementTargeting_NormalizeAndValidate_RejectsEmptyGroup(t *testing.T) {
 	targeting := AnnouncementTargeting{
 		AnyOf: []AnnouncementConditionGroup{

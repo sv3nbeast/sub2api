@@ -21,6 +21,7 @@ const (
 const (
 	AnnouncementConditionTypeSubscription = "subscription"
 	AnnouncementConditionTypeBalance      = "balance"
+	AnnouncementConditionTypeUser         = "user"
 )
 
 const (
@@ -48,7 +49,7 @@ type AnnouncementConditionGroup struct {
 }
 
 type AnnouncementCondition struct {
-	// Type: subscription | balance
+	// Type: subscription | balance | user
 	Type string `json:"type"`
 
 	// Operator:
@@ -59,11 +60,25 @@ type AnnouncementCondition struct {
 	// subscription 条件：匹配的订阅套餐（group_id）
 	GroupIDs []int64 `json:"group_ids,omitempty"`
 
+	// user 条件：匹配的用户（user_id）
+	UserIDs []int64 `json:"user_ids,omitempty"`
+
 	// balance 条件：比较阈值
 	Value float64 `json:"value,omitempty"`
 }
 
 func (t AnnouncementTargeting) Matches(balance float64, activeSubscriptionGroupIDs map[int64]struct{}) bool {
+	return t.matches(0, false, balance, activeSubscriptionGroupIDs)
+}
+
+// MatchesForUser evaluates targeting for an authenticated user. User-targeted
+// conditions are deliberately ignored by Matches so they can never leak into
+// public or anonymous announcement paths.
+func (t AnnouncementTargeting) MatchesForUser(userID int64, balance float64, activeSubscriptionGroupIDs map[int64]struct{}) bool {
+	return t.matches(userID, true, balance, activeSubscriptionGroupIDs)
+}
+
+func (t AnnouncementTargeting) matches(userID int64, allowUserTarget bool, balance float64, activeSubscriptionGroupIDs map[int64]struct{}) bool {
 	// 空规则：展示给所有用户
 	if len(t.AnyOf) == 0 {
 		return true
@@ -76,7 +91,7 @@ func (t AnnouncementTargeting) Matches(balance float64, activeSubscriptionGroupI
 		}
 		allMatched := true
 		for _, cond := range group.AllOf {
-			if !cond.Matches(balance, activeSubscriptionGroupIDs) {
+			if !cond.matches(userID, allowUserTarget, balance, activeSubscriptionGroupIDs) {
 				allMatched = false
 				break
 			}
@@ -90,6 +105,10 @@ func (t AnnouncementTargeting) Matches(balance float64, activeSubscriptionGroupI
 }
 
 func (c AnnouncementCondition) Matches(balance float64, activeSubscriptionGroupIDs map[int64]struct{}) bool {
+	return c.matches(0, false, balance, activeSubscriptionGroupIDs)
+}
+
+func (c AnnouncementCondition) matches(userID int64, allowUserTarget bool, balance float64, activeSubscriptionGroupIDs map[int64]struct{}) bool {
 	switch c.Type {
 	case AnnouncementConditionTypeSubscription:
 		if c.Operator != AnnouncementOperatorIn {
@@ -123,6 +142,17 @@ func (c AnnouncementCondition) Matches(balance float64, activeSubscriptionGroupI
 		default:
 			return false
 		}
+
+	case AnnouncementConditionTypeUser:
+		if !allowUserTarget || c.Operator != AnnouncementOperatorIn || userID <= 0 {
+			return false
+		}
+		for _, targetID := range c.UserIDs {
+			if targetID == userID {
+				return true
+			}
+		}
+		return false
 
 	default:
 		return false
@@ -162,6 +192,12 @@ func (t AnnouncementTargeting) NormalizeAndValidate() (AnnouncementTargeting, er
 				}
 				cond.GroupIDs = append(cond.GroupIDs, gid)
 			}
+			for _, uid := range c.UserIDs {
+				if uid <= 0 {
+					return AnnouncementTargeting{}, ErrAnnouncementInvalidTarget
+				}
+				cond.UserIDs = append(cond.UserIDs, uid)
+			}
 
 			if err := cond.validate(); err != nil {
 				return AnnouncementTargeting{}, err
@@ -183,6 +219,17 @@ func (c AnnouncementCondition) validate() error {
 		}
 		if len(c.GroupIDs) == 0 {
 			return ErrAnnouncementInvalidTarget
+		}
+		return nil
+
+	case AnnouncementConditionTypeUser:
+		if c.Operator != AnnouncementOperatorIn || len(c.UserIDs) == 0 {
+			return ErrAnnouncementInvalidTarget
+		}
+		for _, uid := range c.UserIDs {
+			if uid <= 0 {
+				return ErrAnnouncementInvalidTarget
+			}
 		}
 		return nil
 

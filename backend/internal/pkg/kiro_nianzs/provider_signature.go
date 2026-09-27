@@ -109,12 +109,16 @@ func validateThinkingSignatureEnvelope(value string, requireKiroMarker bool) (pr
 	if err != nil {
 		return providerThinkingSignature{}, err
 	}
-	// Amazon Q currently emits channel version 17 while older, still valid
-	// responses use version 16. Keep the allowlist explicit: the signature is
-	// provider-owned opaque data, so an unknown future version must be reviewed
-	// instead of being accepted as structurally equivalent by accident.
-	if channelVersion.varint != 16 && channelVersion.varint != 17 {
-		return providerThinkingSignature{}, fmt.Errorf("provider thinking signature channel version is %d, want 16 or 17", channelVersion.varint)
+	// Keep the allowlist explicit: the signature is provider-owned opaque data,
+	// so an unknown future version must be reviewed instead of being accepted as
+	// structurally equivalent by accident. Versions 16 and 17 came from earlier
+	// Amazon Q responses. By 2026-09-26 the Q endpoint emitted version 18 for
+	// Opus 4.8, Opus 5 and Opus 5.5 (live probe), and rejecting it silently
+	// dropped every Kiro thinking block.
+	switch channelVersion.varint {
+	case 16, 17, 18:
+	default:
+		return providerThinkingSignature{}, fmt.Errorf("provider thinking signature channel version is %d, want 16, 17 or 18", channelVersion.varint)
 	}
 	if requireKiroMarker {
 		if err := requireProviderSignatureVarint(channel, 2, 1, "provider-native marker"); err != nil {
@@ -125,6 +129,32 @@ func validateThinkingSignatureEnvelope(value string, requireKiroMarker bool) (pr
 	}
 	if err := requireProviderSignatureVarint(channel, 3, 2, "signature schema"); err != nil {
 		return providerThinkingSignature{}, err
+	}
+	// Opus 5.5 (2026-09-26, version 18) sends a compact channel header: the
+	// channel signature (5), provider channel (6) and context ID (11) are all
+	// absent, while the nonce, session, authenticator and signed payload above
+	// are intact. Accept that layout only as a whole; a header carrying some
+	// but not all of the three fields is malformed.
+	if len(channel[5]) == 0 && len(channel[6]) == 0 && len(channel[11]) == 0 {
+		if channelVersion.varint < 18 {
+			return providerThinkingSignature{}, fmt.Errorf("provider thinking signature compact channel header needs version 18, got %d", channelVersion.varint)
+		}
+		channelKindField, err := requireProviderSignatureField(channel, 7, protowire.VarintType, "channel kind")
+		if err != nil {
+			return providerThinkingSignature{}, err
+		}
+		blockKind, err := requireProviderSignatureBytes(channel, 8, "block kind")
+		if err != nil {
+			return providerThinkingSignature{}, err
+		}
+		if string(blockKind) != "thinking" {
+			return providerThinkingSignature{}, fmt.Errorf("provider thinking signature has block kind %q", string(blockKind))
+		}
+		return providerThinkingSignature{
+			ChannelVersion:     channelVersion.varint,
+			ChannelKind:        channelKindField.varint,
+			SignedPayloadBytes: len(signedPayload),
+		}, nil
 	}
 	channelSignature, err := requireProviderSignatureBytes(channel, 5, "channel signature")
 	if err != nil {

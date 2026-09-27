@@ -3284,40 +3284,71 @@ func TestStreamEventStreamAsAnthropicRejectsUnauthenticatedThinkingBeforeClientO
 	}
 }
 
-func TestStreamEventStreamAsAnthropicSuppressesMissingThinkingSignature(t *testing.T) {
-	stream := bytes.NewBuffer(nil)
-	_, _ = stream.Write(buildEventStreamFrame(t, "reasoningContentEvent", map[string]any{
-		"reasoningContentEvent": map[string]any{"text": "provider-only reasoning"},
-	}))
-	_, _ = stream.Write(buildEventStreamFrame(t, "assistantResponseEvent", map[string]any{
-		"assistantResponseEvent": map[string]any{"content": "visible answer"},
-	}))
-	_, _ = stream.Write(buildEventStreamFrame(t, "messageStopEvent", map[string]any{
-		"messageStopEvent": map[string]any{"stop_reason": "end_turn"},
-	}))
-
-	var out bytes.Buffer
-	result, err := StreamEventStreamAsAnthropicWithContext(
-		context.Background(), stream, &out, "claude-opus-5", 11,
-		KiroRequestContext{
-			ThinkingEnabled:                  true,
-			RequireProviderThinkingSignature: true,
-			SuppressUnauthenticatedThinking:  true,
-			RequireTerminalEvent:             true,
-		},
-	)
-	require.NoError(t, err)
-	require.Equal(t, "end_turn", result.StopReason)
-	events := parseAnthropicSSEEventsForTest(t, out.String())
-	var visibleText strings.Builder
-	for _, event := range events {
-		require.NotEqual(t, "thinking", event.Get("content_block.type").String())
-		if event.Get("delta.type").String() == "text_delta" {
-			visibleText.WriteString(event.Get("delta.text").String())
-		}
+// Visible thinking streams before its signature, which Kiro can omit on long
+// turns. Such a block is closed without a signature — never a synthesized one —
+// and the answer that follows is unaffected. Hidden adaptive thinking has
+// nothing to show, so an unsigned hidden block is still dropped.
+func TestStreamEventStreamAsAnthropicHandlesMissingThinkingSignature(t *testing.T) {
+	build := func() *bytes.Buffer {
+		stream := bytes.NewBuffer(nil)
+		_, _ = stream.Write(buildEventStreamFrame(t, "reasoningContentEvent", map[string]any{
+			"reasoningContentEvent": map[string]any{"text": "provider reasoning."},
+		}))
+		_, _ = stream.Write(buildEventStreamFrame(t, "assistantResponseEvent", map[string]any{
+			"assistantResponseEvent": map[string]any{"content": "visible answer"},
+		}))
+		_, _ = stream.Write(buildEventStreamFrame(t, "messageStopEvent", map[string]any{
+			"messageStopEvent": map[string]any{"stop_reason": "end_turn"},
+		}))
+		return stream
 	}
-	require.Equal(t, "visible answer", visibleText.String())
-	require.NotContains(t, out.String(), "provider-only reasoning")
+	run := func(requestCtx KiroRequestContext) []gjson.Result {
+		var out bytes.Buffer
+		result, err := StreamEventStreamAsAnthropicWithContext(context.Background(), build(), &out, "claude-opus-5", 11, requestCtx)
+		require.NoError(t, err)
+		require.Equal(t, "end_turn", result.StopReason)
+		return parseAnthropicSSEEventsForTest(t, out.String())
+	}
+	base := KiroRequestContext{
+		ThinkingEnabled:                  true,
+		RequireProviderThinkingSignature: true,
+		SuppressUnauthenticatedThinking:  true,
+		RequireTerminalEvent:             true,
+	}
+
+	t.Run("visible thinking closes unsigned", func(t *testing.T) {
+		events := run(base)
+		var thinking, text strings.Builder
+		blocks := 0
+		for _, event := range events {
+			if event.Get("content_block.type").String() == "thinking" {
+				blocks++
+			}
+			require.NotEqual(t, "signature_delta", event.Get("delta.type").String(), "a missing signature must not be synthesized")
+			switch event.Get("delta.type").String() {
+			case "thinking_delta":
+				thinking.WriteString(event.Get("delta.thinking").String())
+			case "text_delta":
+				text.WriteString(event.Get("delta.text").String())
+			}
+		}
+		require.Equal(t, 1, blocks)
+		require.Equal(t, "provider reasoning.", thinking.String())
+		require.Equal(t, "visible answer", text.String())
+	})
+
+	t.Run("hidden adaptive thinking is dropped", func(t *testing.T) {
+		hidden := base
+		hidden.SuppressAdaptiveThinkingText = true
+		var text strings.Builder
+		for _, event := range run(hidden) {
+			require.NotEqual(t, "thinking", event.Get("content_block.type").String())
+			if event.Get("delta.type").String() == "text_delta" {
+				text.WriteString(event.Get("delta.text").String())
+			}
+		}
+		require.Equal(t, "visible answer", text.String())
+	})
 }
 
 func TestParseNonStreamingEventStreamRejectsUnauthenticatedThinking(t *testing.T) {
@@ -3576,8 +3607,7 @@ func TestStreamEventStreamAsAnthropicParsesMultipleReasoningEventsWhenEnabled(t 
 	require.Equal(t, "end_turn", result.StopReason)
 
 	output := out.String()
-	require.Contains(t, output, `"thinking":"first thought"`)
-	require.Contains(t, output, `"thinking":"second thought"`)
+	require.Equal(t, "first thoughtsecond thought", streamedThinkingTextForTest(t, output))
 	require.Contains(t, output, `"text":"final"`)
 	// 连续 reasoning 片段必须合并进同一个 thinking 块，而不是每片一个块
 	require.Equal(t, 1, strings.Count(output, `"type":"thinking"`), "consecutive reasoning events should produce exactly one thinking block")
@@ -3600,8 +3630,8 @@ func TestStreamEventStreamAsAnthropicMergesManyReasoningFragmentsIntoOneBlock(t 
 
 	output := out.String()
 	require.Equal(t, 1, strings.Count(output, `"type":"thinking"`), "many reasoning fragments must collapse into a single thinking block")
-	// 每个片段各自一个 thinking_delta，但同属一个块
-	require.Equal(t, 4, strings.Count(output, `"type":"thinking_delta"`))
+	// 片段按句释放（身份披露过滤按句判定），无句末标点的碎片在块结束时一并发出
+	require.Equal(t, "I need to think", streamedThinkingTextForTest(t, output))
 	require.Contains(t, output, `"text":"answer"`)
 }
 
@@ -3642,8 +3672,7 @@ func TestStreamEventStreamAsAnthropicParsesTaggedThinkingWithLeadingApostrophe(t
 
 	output := out.String()
 	require.Contains(t, output, `"type":"thinking_delta"`)
-	require.Contains(t, output, `"thinking":"'re "`)
-	require.Contains(t, output, `"thinking":"working with."`)
+	require.Equal(t, "'re working with.", streamedThinkingTextForTest(t, output))
 	require.Contains(t, output, `"text":"final"`)
 	require.NotContains(t, output, `"text":"\u003cthinking\u003e're working with.\u003c/thinking\u003e`)
 	require.NotContains(t, output, `"text":"'re working with."`)
@@ -5321,4 +5350,17 @@ func TestBuildKiroPayloadLargeClaudeDesktopCompactionSystemStaysInConversation(t
 			require.Equal(t, 1, toolUseCount)
 		})
 	}
+}
+
+// streamedThinkingTextForTest concatenates every thinking_delta in an
+// Anthropic SSE stream.
+func streamedThinkingTextForTest(t *testing.T, output string) string {
+	t.Helper()
+	var text strings.Builder
+	for _, event := range parseAnthropicSSEEventsForTest(t, output) {
+		if event.Get("delta.type").String() == "thinking_delta" {
+			text.WriteString(event.Get("delta.thinking").String())
+		}
+	}
+	return text.String()
 }

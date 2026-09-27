@@ -230,11 +230,11 @@ type KiroRequestContext struct {
 	// path emits empty thinking deltas; explicit budget-based thinking remains
 	// visible and therefore does not set this flag.
 	SuppressAdaptiveThinkingText bool
-	// ExposeAdaptiveThinkingText lets adaptive thinking text through when the
-	// client asked for thinking.display "summarized", as Claude Code does. It
-	// changes visibility only: SuppressAdaptiveThinkingText still selects the
-	// adaptive stream framing and its usage accounting. Visible thinking streams
-	// as it arrives, through the identity disclosure filter.
+	// ExposeAdaptiveThinkingText lets adaptive thinking text through; see
+	// kiroAdaptiveThinkingTextRequested for when. It changes visibility only:
+	// SuppressAdaptiveThinkingText still selects the adaptive stream framing and
+	// its usage accounting. Visible thinking streams as it arrives, through the
+	// identity disclosure filter.
 	ExposeAdaptiveThinkingText bool
 	// AdaptiveThinkingHasExplicitEffort distinguishes Claude's adaptive stream
 	// framing with output_config.effort from the implicit-effort variant. The
@@ -753,7 +753,7 @@ func BuildKiroPayloadWithOptions(claudeBody []byte, modelID, profileArn string, 
 	}
 	requestCtx.SuppressAdaptiveThinkingText = thinking != nil && thinking.Mode == "adaptive"
 	requestCtx.ExposeAdaptiveThinkingText = requestCtx.SuppressAdaptiveThinkingText &&
-		strings.EqualFold(strings.TrimSpace(gjson.GetBytes(claudeBody, "thinking.display").String()), "summarized")
+		kiroAdaptiveThinkingTextRequested(claudeBody, requestCtx.EmitProtocolPing || isClaudeCLIUserAgent(headers))
 	requestCtx.AdaptiveThinkingHasExplicitEffort = requestCtx.SuppressAdaptiveThinkingText &&
 		strings.TrimSpace(gjson.GetBytes(claudeBody, "output_config.effort").String()) != ""
 	preserveNativeClaudeCodeSystem := requestCtx.EmitProtocolPing && strings.Contains(baseSystem, nativeClaudeCodeIdentity)
@@ -2569,6 +2569,30 @@ func buildOperatorInjectedSystemPrompt(modelID, systemPrompt string, thinking *t
 		out += "\n" + systemChunkedWritePolicy
 	}
 	return prependThinkingDirective(out, thinking)
+}
+
+// kiroAdaptiveThinkingTextRequested reports whether adaptive thinking text
+// should reach the client. An explicit thinking.display wins. Claude Code only
+// sends "summarized" when an Anthropic server-side flag is on for the install,
+// and the desktop app on a custom endpoint never gets that flag (2.1.271,
+// 2026-09-27: every thinking block arrived empty), so a Claude Code request
+// that leaves display unset is shown the summary, as first-party Claude Code
+// users are. Other clients keep Claude's omitted default.
+func kiroAdaptiveThinkingTextRequested(claudeBody []byte, claudeCodeClient bool) bool {
+	switch strings.ToLower(strings.TrimSpace(gjson.GetBytes(claudeBody, "thinking.display").String())) {
+	case "summarized":
+		return true
+	case "":
+		return claudeCodeClient
+	default:
+		return false
+	}
+}
+
+// isClaudeCLIUserAgent reports a Claude Code client by its user agent, as the
+// desktop app sends it ("claude-cli/2.1.271 (external, claude-desktop-3p, …)").
+func isClaudeCLIUserAgent(headers http.Header) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(headers.Get("User-Agent"))), "claude-cli/")
 }
 
 // kiroIdentityPromptForModel selects the identity preamble for a non-Sonnet

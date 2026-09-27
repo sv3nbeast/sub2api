@@ -146,13 +146,16 @@ func (u *nianzsCancelableTestUpstream) DoWithTLS(req *http.Request, proxyURL str
 	return u.Do(req, proxyURL, accountID, accountConcurrency)
 }
 
+// nianzsHiddenThinkingMessagesRequest is a Claude Code request that asks for
+// the thinking text to be omitted, so the hidden-thinking path is exercised: a
+// Claude Code request without display would be shown the summary instead.
 func nianzsHiddenThinkingMessagesRequest(t *testing.T) ([]byte, *ParsedRequest, *int64) {
 	t.Helper()
 	body := []byte(`{
 		"model":"claude-opus-5",
 		"stream":true,
 		"max_tokens":64000,
-		"thinking":{"type":"adaptive"},
+		"thinking":{"type":"adaptive","display":"omitted"},
 		"output_config":{"effort":"max"},
 		"tools":[{"name":"Read","description":"read a file","input_schema":{"type":"object","properties":{"path":{"type":"string"}}}}],
 		"messages":[{"role":"user","content":"analyze the issue"}]
@@ -544,6 +547,59 @@ func TestNianzsMessagesOpus46AdaptiveControlStillCompletesNormally(t *testing.T)
 	require.Equal(t, 1, strings.Count(wire, "event: message_stop"))
 	require.NotContains(t, wire, "sub2api_internal_kiro_hidden_thinking_progress")
 	require.NotContains(t, wire, "short provider-only reasoning")
+}
+
+// Claude Code on a custom endpoint never sends thinking.display, so the
+// summary reaches it through the whole Kiro route.
+func TestNianzsMessagesClaudeCodeWithoutDisplaySeesThinkingSummary(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	body, _, groupID := nianzsHiddenThinkingMessagesRequest(t)
+	body = bytes.Replace(body, []byte(`,"display":"omitted"`), nil, 1)
+	require.NotContains(t, string(body), "display")
+	parsed, err := ParseGatewayRequest(NewRequestBodyRef(body), PlatformKiro)
+	require.NoError(t, err)
+	parsed.GroupID = groupID
+
+	stream := bytes.NewBuffer(nil)
+	_, _ = stream.Write(kiroEventStreamFrame(t, "reasoningContentEvent", map[string]any{
+		"reasoningContentEvent": map[string]any{"text": "Counting the divisors of 720 gives 30."},
+	}))
+	_, _ = stream.Write(kiroEventStreamFrame(t, "reasoningContentEvent", map[string]any{
+		"reasoningContentEvent": map[string]any{"signature": nianzsXMLInvokeProviderThinkingSignature()},
+	}))
+	_, _ = stream.Write(kiroEventStreamFrame(t, "assistantResponseEvent", map[string]any{
+		"assistantResponseEvent": map[string]any{"content": "30"},
+	}))
+	_, _ = stream.Write(kiroEventStreamFrame(t, "messageStopEvent", map[string]any{
+		"messageStopEvent": map[string]any{"stop_reason": "end_turn"},
+	}))
+	svc, _, account := newNianzsKiroRouteTestRuntime(t, &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/vnd.amazon.eventstream"}},
+		Body:       io.NopCloser(bytes.NewReader(stream.Bytes())),
+	})
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
+	c.Request.Header.Set("User-Agent", "claude-cli/2.1.271 (external, claude-desktop-3p, agent-sdk/0.2.271)")
+	_, forwardErr := svc.Forward(nianzsHiddenThinkingTestContext(time.Second, 10*time.Millisecond), c, account, parsed)
+	require.NoError(t, forwardErr)
+
+	wire := recorder.Body.String()
+	var thinking strings.Builder
+	signatures := 0
+	for _, delta := range nianzsSSEPayloadsByType(wire, "content_block_delta") {
+		switch delta.Get("delta.type").String() {
+		case "thinking_delta":
+			thinking.WriteString(delta.Get("delta.thinking").String())
+		case "signature_delta":
+			signatures++
+		}
+	}
+	require.Equal(t, "Counting the divisors of 720 gives 30.", thinking.String())
+	require.Equal(t, 1, signatures)
+	require.Equal(t, 1, strings.Count(wire, "event: message_stop"))
 }
 
 func TestFinishNianzsKiroStreamResponseCannotBeReclassifiedForFailover(t *testing.T) {

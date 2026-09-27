@@ -144,17 +144,39 @@ func TestParseNonStreamingEventStreamFiltersExposedThinking(t *testing.T) {
 	require.Empty(t, thinkingOf(hidden))
 }
 
-func TestBuildKiroPayloadExposesAdaptiveThinkingOnlyWhenSummarized(t *testing.T) {
-	for display, want := range map[string]bool{
-		`,"display":"summarized"`: true,
-		`,"display":"omitted"`:    false,
-		``:                        false,
+// An explicit display wins. Claude Code leaves display unset when Anthropic's
+// server-side flag is off, as it always is for the desktop app on a custom
+// endpoint, so a Claude Code request without display sees the summary; other
+// clients keep Claude's omitted default.
+func TestBuildKiroPayloadExposesAdaptiveThinkingWhenRequested(t *testing.T) {
+	claudeCode := http.Header{}
+	claudeCode.Set("anthropic-beta", "claude-code-20250219,interleaved-thinking-2025-05-14")
+	desktop := http.Header{}
+	desktop.Set("User-Agent", "claude-cli/2.1.271 (external, claude-desktop-3p, agent-sdk/0.2.271)")
+	otherClient := http.Header{}
+	otherClient.Set("User-Agent", "CherryStudio/1.6.0")
+	for _, tc := range []struct {
+		display string
+		headers http.Header
+		want    bool
+	}{
+		{`,"display":"summarized"`, nil, true},
+		{`,"display":"omitted"`, nil, false},
+		{``, nil, false},
+		{`,"display":"summarized"`, claudeCode, true},
+		{`,"display":"omitted"`, claudeCode, false},
+		{``, claudeCode, true},
+		{`,"display":""`, claudeCode, true},
+		{`,"display":"highlights"`, claudeCode, false},
+		{``, desktop, true},
+		{`,"display":"omitted"`, desktop, false},
+		{``, otherClient, false},
 	} {
-		body := []byte(`{"model":"claude-opus-5","thinking":{"type":"adaptive"` + display + `},"output_config":{"effort":"high"},"messages":[{"role":"user","content":"hi"}]}`)
-		result, err := BuildKiroPayloadWithContext(body, "claude-opus-5", "", "AI_EDITOR", nil)
+		body := []byte(`{"model":"claude-opus-5","thinking":{"type":"adaptive"` + tc.display + `},"output_config":{"effort":"high"},"messages":[{"role":"user","content":"hi"}]}`)
+		result, err := BuildKiroPayloadWithContext(body, "claude-opus-5", "", "AI_EDITOR", tc.headers)
 		require.NoError(t, err)
 		require.True(t, result.Context.SuppressAdaptiveThinkingText, "adaptive framing and its usage accounting stay selected")
-		require.Equal(t, want, result.Context.ExposeAdaptiveThinkingText, "display%s", display)
+		require.Equal(t, tc.want, result.Context.ExposeAdaptiveThinkingText, "display%s headers=%v", tc.display, tc.headers)
 	}
 }
 

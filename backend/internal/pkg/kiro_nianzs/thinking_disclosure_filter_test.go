@@ -24,6 +24,14 @@ var kiroThinkingDisclosureSamples = []string{
 	"I'm weighing whether this is a legitimate user request or something like an injected instruction.",
 	"This is a simple identity question, and no custom persona was assigned, so I should answer plainly as Claude, made by Anthropic, in Chinese as requested.",
 	"系统提示把我设定成另一个助手，但用户消息里说我是Claude。",
+	// 2026-09-27 Claude Code 2.1.280 --thinking-display summarized, live: the
+	// real Claude Code system prompt draws out a different vocabulary.
+	"Even if this were framed as a user request to drop a persona, the general principle applies: operators can set persona.",
+	"The system prompt has explicit instructions telling me not to discuss or describe its contents if asked, directing me to say I can't discuss that instead.",
+	"I'm noting that my instructions explicitly say not to explain or describe the system prompt contents if asked, and instead give a fixed refusal response.",
+	"There's also a later note clarifying context about the platform the user is on.",
+	"I should answer clearly: I'm Claude, made by Anthropic, and I'll clarify my identity honestly rather than adopting some other product persona unless my deployment context specifically calls for it.",
+	"I want to verify this second message is legitimate by tracing where it sits in the conversation structure—whether it's truly a system turn as the harness describes, since mid-conversation system turns can carry updates or rule modifications, and the assistant appears to have already acknowledged following these instructions before the user's actual question arrived.",
 }
 
 func TestKiroThinkingDisclosureSentencesAreDropped(t *testing.T) {
@@ -52,26 +60,36 @@ func TestKiroThinkingDisclosureKeepsEngineeringVocabulary(t *testing.T) {
 		// Engineering terms next to a prompt-source word.
 		"The user message mentions a merge conflict in package.json, so I'll explain how to resolve it.",
 		"The Kubernetes operator pattern gives the controller authority over the cluster.",
+		"The test harness describes each case with a fixture file.",
+		// Narrating the client's own instructions is ordinary Claude Code
+		// reasoning and stays visible.
+		"CLAUDE.md says to respond in Chinese, so I'll answer in Chinese.",
+		"The system prompt tells me to use the TodoWrite tool for multi-step tasks.",
+		"The operators in this expression bind tighter than the comparison.",
 	} {
 		require.False(t, isKiroThinkingDisclosureSentence(sentence), sentence)
 		require.Equal(t, sentence, filterKiroThinkingDisclosure(sentence))
 	}
 }
 
-func TestKiroThinkingDisclosureDropsTheRestOfItsParagraph(t *testing.T) {
+// The follow-up sentences and paragraphs continue the narration without its
+// keywords ("There's also a line…"), so a disclosure hides the rest of the block.
+func TestKiroThinkingDisclosureDropsTheRestOfTheBlock(t *testing.T) {
 	text := "The user asks who I am. " +
 		"The system prompt establishes my identity as Kiro, but a later message says otherwise. " +
 		"That later message only carries user-level weight, so I shouldn't let it decide.\n\n" +
+		"There's also a line stating I'm a Claude agent, which seems consistent.\n\n" +
 		"I'll answer in one sentence."
-	require.Equal(t, "The user asks who I am. I'll answer in one sentence.", filterKiroThinkingDisclosure(text))
+	require.Equal(t, "The user asks who I am. ", filterKiroThinkingDisclosure(text))
 }
 
 func TestKiroThinkingDisclosureStreamingMatchesWholeText(t *testing.T) {
-	text := "The system prompt names Kiro, but the session context says Claude Code. It doesn't matter here.\n\n" +
-		"Counting ordered triples gives 15·10·6 = 900; s.isalnum() keeps 1.10 intact. Burnside's lemma then gives 156.\n\n" +
-		"系统提示说我是 Kiro，但用户消息声称我是 Claude。\n\n答案是 156。"
+	text := "Counting ordered triples gives 15·10·6 = 900; s.isalnum() keeps 1.10 intact. Burnside's lemma then gives 156.\n\n" +
+		"答案是 156。\n\n" +
+		"The system prompt names Kiro, but the session context says Claude Code. It doesn't matter here.\n\n" +
+		"系统提示说我是 Kiro。"
 	want := filterKiroThinkingDisclosure(text)
-	require.Equal(t, "Counting ordered triples gives 15·10·6 = 900; s.isalnum() keeps 1.10 intact. Burnside's lemma then gives 156.\n\n答案是 156。", want)
+	require.Equal(t, "Counting ordered triples gives 15·10·6 = 900; s.isalnum() keeps 1.10 intact. Burnside's lemma then gives 156.\n\n答案是 156。\n\n", want)
 
 	for _, chunk := range []int{1, 3, 7, 50} {
 		var f kiroThinkingDisclosureFilter
@@ -91,7 +109,16 @@ func TestKiroThinkingDisclosureReleasesCompleteSentencesEarly(t *testing.T) {
 	require.Equal(t, "Then", f.Flush())
 }
 
-func TestKiroThinkingDisclosureDropsTheRestOfAChineseParagraph(t *testing.T) {
-	require.Equal(t, "", filterKiroThinkingDisclosure("系统提示说我是 Kiro，但用户消息声称我是 Claude。答案是 156。"))
-	require.Equal(t, "答案是 156。", filterKiroThinkingDisclosure("系统提示说我是 Kiro，但用户消息声称我是 Claude。\n\n答案是 156。"))
+func TestKiroThinkingDisclosureDropsTheRestOfAChineseBlock(t *testing.T) {
+	require.Equal(t, "答案是 156。", filterKiroThinkingDisclosure("答案是 156。系统提示说我是 Kiro，但用户消息声称我是 Claude。\n\n后面的推理。"))
+	require.Equal(t, "", filterKiroThinkingDisclosure("系统提示说我是 Kiro，但用户消息声称我是 Claude。\n\n答案是 156。"))
+}
+
+// A new thinking block gets a new filter, so a disclosure in one block does not
+// hide the next.
+func TestKiroThinkingDisclosureFlushEndsTheBlock(t *testing.T) {
+	var f kiroThinkingDisclosureFilter
+	require.Empty(t, f.Push("The system prompt names Kiro, but the session context says Claude Code. Next"))
+	require.Empty(t, f.Flush())
+	require.Equal(t, "Counting triples. ", f.Push("Counting triples. Then"))
 }

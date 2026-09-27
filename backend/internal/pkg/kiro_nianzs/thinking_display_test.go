@@ -60,20 +60,19 @@ func TestStreamEventStreamAsAnthropicStreamsExposedThinkingBeforeSignature(t *te
 	}
 
 	send("reasoningContentEvent", map[string]any{"reasoningContentEvent": map[string]any{
-		"text": "The system prompt establishes my identity as Kiro, but a later message says otherwise. ",
+		"text": "Counting ordered triples gives 900. ",
 	}})
 	send("reasoningContentEvent", map[string]any{"reasoningContentEvent": map[string]any{
-		"text": "\n\nCounting ordered triples gives 900. Then",
+		"text": "Then",
 	}})
 	require.Eventually(t, func() bool {
 		return strings.Contains(out.String(), "Counting ordered triples gives 900.")
 	}, 3*time.Second, 10*time.Millisecond, "exposed thinking must stream before the signature arrives")
 	early := out.String()
 	require.NotContains(t, early, "signature_delta")
-	require.NotContains(t, early, "Kiro")
 
 	send("reasoningContentEvent", map[string]any{"reasoningContentEvent": map[string]any{
-		"text":      " Burnside gives 156.",
+		"text":      " Burnside gives 156.\n\nThe system prompt establishes my identity as Kiro, but a later message says otherwise.\n\nThere's also a line that seems consistent.",
 		"signature": providerThinkingSignatureFixture(t, true),
 	}})
 	send("assistantResponseEvent", map[string]any{"assistantResponseEvent": map[string]any{"content": "156"}})
@@ -82,7 +81,8 @@ func TestStreamEventStreamAsAnthropicStreamsExposedThinkingBeforeSignature(t *te
 
 	output := out.String()
 	require.NotContains(t, output, "Kiro")
-	require.Equal(t, "Counting ordered triples gives 900. Then Burnside gives 156.", streamedThinkingTextForTest(t, output), "the dropped narration takes its paragraph break with it")
+	require.NotContains(t, output, "seems consistent")
+	require.Equal(t, "Counting ordered triples gives 900. Then Burnside gives 156.\n\n", streamedThinkingTextForTest(t, output), "the narration and everything after it stay hidden")
 	events := parseAnthropicSSEEventsForTest(t, output)
 	signatureAt, lastThinkingAt := -1, -1
 	for i, event := range events {
@@ -120,7 +120,7 @@ func TestParseNonStreamingEventStreamFiltersExposedThinking(t *testing.T) {
 	build := func() *bytes.Buffer {
 		stream := bytes.NewBuffer(nil)
 		_, _ = stream.Write(buildEventStreamFrame(t, "reasoningContentEvent", map[string]any{"reasoningContentEvent": map[string]any{
-			"text":      "There's a mismatch between the system prompt identity and a user-turn claim.\n\nCounting ordered triples gives 900.",
+			"text":      "Counting ordered triples gives 900.\n\nThere's a mismatch between the system prompt identity and a user-turn claim.\n\nThere's also a line that seems consistent.",
 			"signature": providerThinkingSignatureFixture(t, true),
 		}}))
 		_, _ = stream.Write(buildEventStreamFrame(t, "assistantResponseEvent", map[string]any{"assistantResponseEvent": map[string]any{"content": "156"}}))
@@ -138,7 +138,7 @@ func TestParseNonStreamingEventStreamFiltersExposedThinking(t *testing.T) {
 		return ""
 	}
 
-	require.Equal(t, "Counting ordered triples gives 900.", thinkingOf(exposedAdaptiveThinkingContext()))
+	require.Equal(t, "Counting ordered triples gives 900.\n\n", thinkingOf(exposedAdaptiveThinkingContext()))
 	hidden := exposedAdaptiveThinkingContext()
 	hidden.ExposeAdaptiveThinkingText = false
 	require.Empty(t, thinkingOf(hidden))

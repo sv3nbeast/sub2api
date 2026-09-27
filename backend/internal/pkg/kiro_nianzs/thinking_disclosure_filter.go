@@ -18,13 +18,14 @@ import (
 // weighs the authority of the prompt structure. Requiring two signals keeps
 // ordinary engineering vocabulary ("SQL injection", "merge conflict", "method
 // override", "Kubernetes operator") visible. Once a disclosure sentence is
-// found, the rest of its paragraph is dropped too: the follow-up sentences
-// continue the same argument without repeating the keywords.
+// found, the rest of the thinking block is dropped too: the follow-up
+// sentences, and often the next paragraph ("There's also a line…"), continue
+// the same argument without repeating the keywords.
 var (
-	kiroThinkingDisclosureAlways = regexp.MustCompile(`(?i)\bkiro\b|model_information|deployment notes|\bcustom persona\b|\bpersona (?:was |is |has been )?(?:assigned|given|set|configured|specified)\b|\binjected instructions?\b|session (?:context|information|note)|harness message|persona-breaking|operator[- ](?:level|notes|authority|instructions?|framing|persona|configuration)|identity (?:claim|signal|framing|swap|assignment|override|context|clarification)`)
-	kiroThinkingIdentityTopic    = regexp.MustCompile(`(?i)\bidentit(?:y|ies)\b|\bpersonas?\b|\bwho i am\b|\bidentif(?:y|ies|ying) (?:me|myself|as)\b|\bi'?m (?:actually |really )?(?:claude|kiro)\b|\bi am (?:actually |really )?(?:claude|kiro)\b|身份|人设|我是谁|我是\s*(?:claude|kiro)`)
-	kiroThinkingPromptStructure  = regexp.MustCompile(`(?i)system[- ]?(?:prompt|level|message|directive|instruction|assigned)|\bthe system (?:prompt |message )?(?:names|identifies|establishes|says|sets|claims|mentions)|user[- ](?:turn|message|level|authored)|\boperator\b|\boverrid(?:e|es|ing) (?:my|me|the system|what the system|that|this|it|who)\b|\bconflict|\bmismatch|\bdiscrepanc|\btension\b|\bcontradict|\binjection\b|\binjected\b|\bprecedence\b|\bauthorit(?:y|ative)\b|\b(?:later|earlier|preceding|previous|prior|embedded|other) (?:message|instruction|note|context|framing|text)|\bframing\b|系统提示|用户消息|运营|注入|冲突|覆盖|优先|权威`)
-	kiroThinkingStructureSource  = regexp.MustCompile(`(?i)system[- ]?(?:prompt|level|message|directive|instruction)|user[- ](?:turn|authored)|\buser message\b|\buser[- ]level (?:instruction|context|claim|content|authority)|\boperator\b|\btool result|系统提示|用户消息|运营`)
+	kiroThinkingDisclosureAlways = regexp.MustCompile(`(?i)\bkiro\b|model_information|deployment notes|\bcustom persona\b|\bpersona (?:was |is |has been )?(?:assigned|given|set|configured|specified)\b|\binjected instructions?\b|\bnot to (?:discuss|describe|explain|reveal|disclose|share|summari[sz]e|repeat)(?: or (?:discuss|describe|explain|reveal|disclose|share|summari[sz]e|repeat))? (?:the |its |my |these |any )?(?:system prompt|prompt|contents|instructions)\b|\bfixed refusal\b|\b(?:later|earlier|separate|additional|another|second) note (?:clarif\w*|about|saying|stating|that|which)\b|\bplatform the user is (?:on|using)\b|session (?:context|information|note)|harness message|\bthe harness (?:describes|says|states|mentions|notes)\b|\bassistant (?:appears to have |seems to have |has |had )?(?:already )?acknowledged\b|persona-breaking|operator[- ](?:level|notes|authority|instructions?|framing|persona|configuration)|identity (?:claim|signal|framing|swap|assignment|override|context|clarification)`)
+	kiroThinkingIdentityTopic    = regexp.MustCompile(`(?i)\bidentit(?:y|ies)\b|\bpersonas?\b|\bwho i am\b|\bidentif(?:y|ies|ying) (?:me|myself|as)\b|\bi'?m (?:actually |really )?(?:an? )?(?:claude|kiro)\b|\bi am (?:actually |really )?(?:an? )?(?:claude|kiro)\b|身份|人设|我是谁|我是\s*(?:claude|kiro)`)
+	kiroThinkingPromptStructure  = regexp.MustCompile(`(?i)system[- ]?(?:prompt|level|message|directive|instruction|assigned|turn)|\bconversation structure\b|\bdeployment (?:context|instructions?|configuration)\b|\bthe system (?:prompt |message )?(?:names|identifies|establishes|says|sets|claims|mentions)|user[- ](?:turn|message|level|authored)|\boperators?\b|\boverrid(?:e|es|ing) (?:my|me|the system|what the system|that|this|it|who)\b|\bconflict|\bmismatch|\bdiscrepanc|\btension\b|\bcontradict|\binjection\b|\binjected\b|\bprecedence\b|\bauthorit(?:y|ative)\b|\b(?:later|earlier|preceding|previous|prior|embedded|other) (?:message|instruction|note|context|framing|text)|\bframing\b|系统提示|用户消息|运营|注入|冲突|覆盖|优先|权威`)
+	kiroThinkingStructureSource  = regexp.MustCompile(`(?i)system[- ]?(?:prompt|level|message|directive|instruction|turn)|\bconversation structure\b|user[- ](?:turn|authored)|\buser message\b|\buser[- ]level (?:instruction|context|claim|content|authority)|\boperators?\b|\btool result|系统提示|用户消息|运营`)
 	// kiroThinkingEngineeringTerms are removed before the signals are checked, so
 	// that a sentence about a merge conflict in the user message is not read as a
 	// conflict between prompt sources.
@@ -49,12 +50,12 @@ func isKiroThinkingDisclosureSentence(sentence string) bool {
 }
 
 // kiroThinkingDisclosureFilter buffers streamed reasoning until a sentence is
-// complete, then releases it unless it belongs to a disclosure. The latency it
-// adds is one sentence. A filter serves one thinking block.
+// complete, then releases it unless a disclosure has been seen in this block.
+// The latency it adds is one sentence. A filter serves one thinking block.
 type kiroThinkingDisclosureFilter struct {
 	pending strings.Builder
-	// dropping is set by a disclosure sentence and cleared at the end of its
-	// paragraph.
+	// dropping is set by the first disclosure sentence and holds for the rest
+	// of the block.
 	dropping bool
 }
 
@@ -86,14 +87,11 @@ func (f *kiroThinkingDisclosureFilter) Flush() string {
 func (f *kiroThinkingDisclosureFilter) filterSentences(text string) string {
 	var out strings.Builder
 	for _, sentence := range splitKiroThinkingSentences(text) {
-		if isKiroThinkingDisclosureSentence(sentence) {
+		if !f.dropping && isKiroThinkingDisclosureSentence(sentence) {
 			f.dropping = true
 		}
 		if !f.dropping {
 			out.WriteString(sentence)
-		}
-		if strings.Contains(sentence[len(strings.TrimRight(sentence, " \t\r\n")):], "\n\n") {
-			f.dropping = false
 		}
 	}
 	return out.String()

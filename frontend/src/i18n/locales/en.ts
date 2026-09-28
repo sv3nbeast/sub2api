@@ -4949,9 +4949,11 @@ const baseMessages = {
         authRegionLabel: 'AWS IDC Region',
         authRegionHint: 'Used only for IDC/OAuth authentication and token refresh. It does not select the Kiro API region.',
         apiRegionLabel: 'Kiro API Region',
+        apiRegionInvalid: 'Kiro API Region must be a valid AWS region, such as us-east-1',
         apiRegionHint:
           'Used for model requests, profile discovery, and usage queries. It may differ from the IDC region. When empty, the region is inferred from the profile or IDC region.',
         generationApiKeyLabel: 'Kiro CLI Generation Key',
+        generationApiKeyInvalid: 'Kiro CLI generation key must start with ksk_',
         generationApiKeyCreateHint: 'Optional. When an account ksk_ key is set, model requests use Kiro CLI Runtime while OAuth remains available for refresh and usage queries.',
         generationApiKeyEditHint: 'Leave empty to keep the current key. A new ksk_ key routes model requests through Kiro CLI Runtime.',
         relayBaseUrlHint:

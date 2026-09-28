@@ -125,6 +125,8 @@ func TestAccountKiroCredentialsNormalizeLegacyShapes(t *testing.T) {
 	require.Equal(t, "ksk_oauth_generation", account.KiroAPIKey())
 	account.Credentials = map[string]any{"api_key": "unrelated-legacy-field"}
 	require.Empty(t, account.KiroAPIKey())
+	account.Credentials = map[string]any{"kiro_api_key": "admin@sub2api.local"}
+	require.Empty(t, account.KiroAPIKey(), "malformed OAuth CLI keys must not override OAuth credentials")
 
 	account.Credentials = map[string]any{
 		"client_id":      "external-client",
@@ -148,6 +150,14 @@ func TestAccountKiroCredentialsNormalizeLegacyShapes(t *testing.T) {
 		"client_secret": "legacy-idc-secret",
 	}
 	require.Equal(t, kiropkg.AuthMethodIDC, account.KiroAuthMethod())
+}
+
+func TestKiroAPIRegionIgnoresMalformedOverride(t *testing.T) {
+	account := &Account{Credentials: map[string]any{
+		"api_region":  "admin@sub2api.local",
+		"profile_arn": "arn:aws:codewhisperer:eu-central-1:123456789012:profile/example",
+	}}
+	require.Equal(t, "eu-central-1", kiroAPIRegion(account))
 }
 
 func TestNewKiroJSONRequestAddsConditionalHeaders(t *testing.T) {

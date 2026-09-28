@@ -3624,9 +3624,43 @@ func normalizeAccountConcurrency(platform, accountType string, concurrency int) 
 	return concurrency
 }
 
+func submittedCredentialString(credentials map[string]any, key string) (string, bool) {
+	if credentials == nil {
+		return "", false
+	}
+	value, ok := credentials[key]
+	if !ok || value == nil {
+		return "", ok
+	}
+	text, ok := value.(string)
+	if !ok {
+		return "", true
+	}
+	return strings.TrimSpace(text), true
+}
+
+// validateAccountProxy rejects soft-deleted, inactive, or expired proxies before
+// an account can persist the proxy_id.
+func (s *adminServiceImpl) validateAccountProxy(ctx context.Context, proxyID *int64) error {
+	if proxyID == nil || *proxyID == 0 || s == nil || s.proxyRepo == nil {
+		return nil
+	}
+	proxy, err := s.proxyRepo.GetByID(ctx, *proxyID)
+	if err != nil {
+		return err
+	}
+	if proxy == nil || !proxy.IsActive() || proxy.IsExpired(time.Now()) {
+		return infraerrors.BadRequest("ACCOUNT_PROXY_UNAVAILABLE", "selected proxy is inactive, expired, or deleted")
+	}
+	return nil
+}
+
 func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error) {
 	if input == nil {
 		return nil, ErrAccountNilInput
+	}
+	if err := s.validateAccountProxy(ctx, input.ProxyID); err != nil {
+		return nil, err
 	}
 	if AnthropicStableCanaryExtraUpdateTouchesManagedFields(input.Extra) {
 		return nil, fmt.Errorf("%w: enrollment fields require the dedicated canary lifecycle", ErrAnthropicStableCanaryReserved)
@@ -3841,6 +3875,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	if input == nil {
 		return nil, ErrAccountNilInput
 	}
+	if err := s.validateAccountProxy(ctx, input.ProxyID); err != nil {
+		return nil, err
+	}
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -3913,6 +3950,17 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		}
 		if err := NormalizeOpenCodeGoProtocolRulesCredentials(account.Credentials); err != nil {
 			return nil, err
+		}
+	}
+	if account.Platform == PlatformKiro {
+		// Validate only values explicitly submitted in this update. Existing rows may
+		// contain legacy malformed fields; runtime ignores those values and a routine
+		// edit must not be blocked by historical data.
+		if rawRegion, submitted := submittedCredentialString(input.Credentials, "api_region"); submitted && rawRegion != "" && !isValidKiroAPIRegion(rawRegion) {
+			return nil, infraerrors.BadRequest("INVALID_KIRO_API_REGION", "Kiro API Region must be a valid AWS region such as us-east-1")
+		}
+		if rawKey, submitted := submittedCredentialString(input.Credentials, "kiro_api_key"); submitted && rawKey != "" && account.Type == AccountTypeOAuth && !strings.HasPrefix(strings.ToLower(rawKey), "ksk_") {
+			return nil, infraerrors.BadRequest("INVALID_KIRO_CLI_KEY", "Kiro CLI generation key must start with ksk_")
 		}
 	}
 	// Extra 使用 map：需要区分“未提供(nil)”与“显式清空({})”。

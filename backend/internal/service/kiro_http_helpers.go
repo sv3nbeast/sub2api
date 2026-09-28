@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
 	kiropkg "github.com/Wei-Shaw/sub2api/internal/pkg/kiro"
@@ -22,6 +23,15 @@ const (
 	kiroBuilderIDProfileARN             = "arn:aws:codewhisperer:us-east-1:638616132270:profile/AAAACCCCXXXX"
 	kiroSocialProfileARN                = "arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK"
 )
+
+var kiroAWSRegionPattern = regexp.MustCompile(`^[a-z]{2}(?:-[a-z0-9]+)+-\d+$`)
+
+// isValidKiroAPIRegion keeps malformed administrator input out of AWS hostnames.
+// An email or account name here would produce a hostname such as
+// q.<value>.amazonaws.com and turn a harmless edit into a persistent 503.
+func isValidKiroAPIRegion(region string) bool {
+	return kiroAWSRegionPattern.MatchString(strings.ToLower(strings.TrimSpace(region)))
+}
 
 func buildKiroAccountKey(account *Account) string {
 	if account == nil {
@@ -161,7 +171,7 @@ func kiroAPIRegionCandidates(account *Account) []string {
 	seen := make(map[string]struct{}, 4)
 	add := func(region string) {
 		region = strings.TrimSpace(region)
-		if region == "" {
+		if region == "" || !isValidKiroAPIRegion(region) {
 			return
 		}
 		key := strings.ToLower(region)

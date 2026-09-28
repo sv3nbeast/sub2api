@@ -4280,6 +4280,13 @@ const applyOpenAIModelMappingCredentials = (credentials: Record<string, unknown>
     delete credentials.compact_model_mapping
   }
 }
+
+const isValidKiroAPIRegion = (value: string) =>
+  /^[a-z]{2}(?:-[a-z0-9]+)+-\d+$/i.test(value.trim())
+
+const isValidKiroGenerationAPIKey = (value: string) =>
+  /^ksk_[^\s]+$/i.test(value.trim())
+
 const syncFormFromAccount = (newAccount: Account | null) => {
   if (!newAccount) {
     return
@@ -5534,6 +5541,22 @@ const handleSubmit = async () => {
 			return
 		}
 	}
+
+  // Empty values clear the optional override. Any non-empty value is validated
+  // before the full credentials payload is built, so stale form state cannot
+  // become an AWS hostname or an OAuth credential override.
+  if (isKiroDirectAccount.value) {
+    const apiRegion = editKiroAPIRegion.value.trim()
+    if (apiRegion && !isValidKiroAPIRegion(apiRegion)) {
+      appStore.showError(t('admin.accounts.kiro.apiRegionInvalid'))
+      return
+    }
+    const generationAPIKey = editKiroGenerationAPIKey.value.trim()
+    if (generationAPIKey && !isValidKiroGenerationAPIKey(generationAPIKey)) {
+      appStore.showError(t('admin.accounts.kiro.generationApiKeyInvalid'))
+      return
+    }
+  }
 
   const updatePayload: Record<string, unknown> = { ...form }
   try {

@@ -43,21 +43,19 @@ func TestMergePreservingSensitiveCreds_OverwritesWhenIncomingProvidesSensitive(t
 	require.Equal(t, "sk-old", out["api_key"], "incoming 没传应保留")
 }
 
-func TestMergePreservingSensitiveCreds_ExplicitNullDeletesSensitiveCredential(t *testing.T) {
+func TestMergePreservingSensitiveCreds_EmptySensitiveValuesPreserveExisting(t *testing.T) {
 	existing := map[string]any{
-		"kiro_api_key":  "ksk-old",
-		"kiroApiKey":    "ksk-legacy-old",
 		"refresh_token": "rt-old",
+		"kiro_api_key":  "ksk-old",
 	}
 	incoming := map[string]any{
-		"kiro_api_key": nil,
+		"refresh_token": "",
+		"kiro_api_key":  nil,
 	}
 
 	out := MergePreservingSensitiveCreds(existing, incoming)
-
-	require.NotContains(t, out, "kiro_api_key")
-	require.NotContains(t, out, "kiroApiKey")
-	require.Equal(t, "rt-old", out["refresh_token"], "未触碰的其他敏感凭据仍应保留")
+	require.Equal(t, "rt-old", out["refresh_token"])
+	require.Equal(t, "ksk-old", out["kiro_api_key"])
 }
 
 func TestMergePreservingSensitiveCreds_DoesNotMutateInputs(t *testing.T) {

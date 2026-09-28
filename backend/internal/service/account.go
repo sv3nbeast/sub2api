@@ -348,6 +348,12 @@ func (a *Account) KiroAPIKey() string {
 	}
 	for _, key := range keys {
 		if value := strings.TrimSpace(a.GetCredential(key)); value != "" {
+			// OAuth accounts may carry an optional CLI generation key. Ignore
+			// malformed legacy values so an accidental edit cannot make the
+			// gateway treat an OAuth access token as an API key.
+			if a.Type == AccountTypeOAuth && !strings.HasPrefix(strings.ToLower(value), "ksk_") {
+				continue
+			}
 			return value
 		}
 	}

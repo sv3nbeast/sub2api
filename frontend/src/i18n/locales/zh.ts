@@ -4991,8 +4991,10 @@ const baseMessages = {
         authRegionLabel: 'AWS IDC 区域',
         authRegionHint: '仅用于 IDC/OAuth 认证和 Token 刷新，不会限定 Kiro API 所在区域。',
         apiRegionLabel: 'Kiro API 区域',
+        apiRegionInvalid: 'Kiro API Region 必须是有效的 AWS 区域，例如 us-east-1',
         apiRegionHint: '用于模型调用、Profile 和用量查询，可与 IDC 区域不同。留空时将从 Profile 或 IDC 区域推断。',
         generationApiKeyLabel: 'Kiro CLI 生成 Key',
+        generationApiKeyInvalid: 'Kiro CLI 生成 Key 必须以 ksk_ 开头',
         generationApiKeyCreateHint: '可选。填写账号自身的 ksk_ Key 后，模型调用走 Kiro CLI Runtime；OAuth 凭证仍用于刷新和用量查询。',
         generationApiKeyEditHint: '留空保留现有 Key。填写新的 ksk_ Key 后，模型调用走 Kiro CLI Runtime。',
         relayBaseUrlHint:

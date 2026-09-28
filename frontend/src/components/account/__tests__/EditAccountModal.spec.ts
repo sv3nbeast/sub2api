@@ -1866,6 +1866,9 @@ describe('EditAccountModal', () => {
     expect(updateAccountMock).toHaveBeenCalledTimes(1)
     const credentials = updateAccountMock.mock.calls[0]?.[1]?.credentials
     expect(credentials).not.toHaveProperty('api_region')
+    // The CLI key field is intentionally blank because the value is redacted;
+    // saving the form must omit it so the backend preserves the stored secret.
+    expect(credentials).not.toHaveProperty('kiro_api_key')
     expect(credentials?.region).toBe('us-east-2')
   })
 

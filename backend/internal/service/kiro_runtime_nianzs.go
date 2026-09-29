@@ -1450,6 +1450,16 @@ func (s *GatewayService) kiroOperatorInstructionsForPayload(ctx context.Context)
 	return s.settingService.GetKiroOperatorInstructions(ctx)
 }
 
+// kiroHistoryReasoningContentEnabled reports whether historical signed thinking
+// replays to Kiro as provider-native reasoningContent. Default on; disabled
+// with GATEWAY_KIRO_HISTORY_REASONING_CONTENT_DISABLED=true.
+func (s *GatewayService) kiroHistoryReasoningContentEnabled() bool {
+	if s == nil || s.cfg == nil {
+		return true
+	}
+	return !s.cfg.Gateway.KiroHistoryReasoningContentDisabled
+}
+
 func (s *GatewayService) buildKiroPayloadForAccountWithArnNianzs(ctx context.Context, account *Account, parsed *ParsedRequest, anthropicBody []byte, modelID, token, requestModel string, headers http.Header, profileArn string, flattenCompletedToolHistory, compactOldCompletedToolHistory bool, options nianzsKiroUpstreamRequestOptions) (*nianzskiro.KiroBuildResult, error) {
 	_ = token
 	anthropicBody = nianzsPrepareKiroPayloadBodyForRequestModel(anthropicBody, requestModel)
@@ -1470,6 +1480,7 @@ func (s *GatewayService) buildKiroPayloadForAccountWithArnNianzs(ctx context.Con
 		RequireNativeToolCallMarker:            requireNativeToolCallMarker,
 		RequireNativeToolTextPrelude:           requireNativeToolTextPrelude,
 		OperatorInstructions:                   s.kiroOperatorInstructionsForPayload(ctx),
+		EmitHistoryReasoningContent:            s.kiroHistoryReasoningContentEnabled(),
 		FlattenCompletedToolHistory:            flattenCompletedToolHistory,
 		CompletedToolHistoryKeepRecentToolUses: keepRecentToolUses,
 		CompletedToolHistoryOldInputLimit:      oldToolInputLimit,

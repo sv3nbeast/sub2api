@@ -1087,6 +1087,13 @@ type GatewayConfig struct {
 	// 固定上游快照。KiroNianzsGroupIDs 允许在全局 legacy 模式下按分组灰度。
 	KiroEngine         string  `mapstructure:"kiro_engine"`
 	KiroNianzsGroupIDs []int64 `mapstructure:"kiro_nianzs_group_ids"`
+	// KiroHistoryReasoningContentDisabled turns off replaying a historical
+	// assistant turn's signed thinking to Kiro as provider-native
+	// reasoningContent. It is on by default because it matches the official
+	// client and lowers the upstream content-filter stop rate; set
+	// GATEWAY_KIRO_HISTORY_REASONING_CONTENT_DISABLED=true to fall back to the
+	// inline-text history without a redeploy.
+	KiroHistoryReasoningContentDisabled bool `mapstructure:"kiro_history_reasoning_content_disabled"`
 
 	// TLSFingerprint: TLS指纹伪装配置
 	TLSFingerprint TLSFingerprintConfig `mapstructure:"tls_fingerprint"`
@@ -2484,6 +2491,7 @@ func setDefaults() {
 	// GATEWAY_KIRO_ENGINE=legacy (and an empty canary allowlist).
 	viper.SetDefault("gateway.kiro_engine", KiroEngineNianzs)
 	viper.SetDefault("gateway.kiro_nianzs_group_ids", []int64{})
+	viper.SetDefault("gateway.kiro_history_reasoning_content_disabled", false)
 	viper.SetDefault("gateway.force_codex_cli", false)
 	viper.SetDefault("gateway.disable_codex_identity_enforcement", false)
 	viper.SetDefault("gateway.disable_codex_originator_normalization", false)

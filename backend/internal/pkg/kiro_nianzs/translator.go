@@ -249,6 +249,11 @@ type KiroRequestContext struct {
 	// after the first content_block_start, so multi-turn server tools cannot
 	// create duplicate pings in one downstream message.
 	EmitProtocolPing bool
+	// EmitHistoryReasoningContent replays a historical assistant turn's signed
+	// thinking as provider-native reasoningContent instead of inlining it as
+	// text, matching the official client and lowering the upstream
+	// content-filter stop rate.
+	EmitHistoryReasoningContent bool
 	// EmitHiddenThinkingProgress publishes a content-free internal control event
 	// while adaptive reasoning is waiting for its provider signature. The
 	// service-layer semantic gate consumes the event as proof that generation
@@ -353,6 +358,9 @@ type KiroPayloadOptions struct {
 	// declarative identity preamble for Claude models outside the Sonnet family.
 	// Empty disables it. GPT and Sonnet models keep the legacy assembly.
 	OperatorInstructions string
+	// EmitHistoryReasoningContent replays signed historical thinking as
+	// provider-native reasoningContent. See the KiroRequestContext field.
+	EmitHistoryReasoningContent bool
 	// FlattenCompletedToolHistory compacts completed tool cycles according to
 	// the recent window below. Without a window, only the active final tool turn
 	// stays structured for KRS compatibility. Flattened results remain bounded
@@ -452,8 +460,21 @@ type KiroInputSchema struct {
 }
 
 type KiroAssistantResponseMessage struct {
-	Content  string        `json:"content"`
-	ToolUses []KiroToolUse `json:"toolUses,omitempty"`
+	Content          string                `json:"content"`
+	ToolUses         []KiroToolUse         `json:"toolUses,omitempty"`
+	ReasoningContent *KiroReasoningContent `json:"reasoningContent,omitempty"`
+}
+
+// KiroReasoningContent replays a historical assistant turn's provider-native
+// reasoning to Kiro, matching the shape the official client sends. The signature
+// carries the reasoning across the wire; the text is a summary.
+type KiroReasoningContent struct {
+	ReasoningText KiroReasoningText `json:"reasoningText"`
+}
+
+type KiroReasoningText struct {
+	Text      string `json:"text"`
+	Signature string `json:"signature,omitempty"`
 }
 
 type KiroToolUse struct {
@@ -687,6 +708,7 @@ func BuildKiroPayloadWithOptions(claudeBody []byte, modelID, profileArn string, 
 		OldCompletedToolHistoryCompacted: options.FlattenCompletedToolHistory && options.CompletedToolHistoryOldInputLimit > 0 && options.CompletedToolHistoryOldResultLimit > 0,
 	}
 	requestCtx.EmitProtocolPing = anthropicBetaHeaderContains(headers, "claude-code-20250219")
+	requestCtx.EmitHistoryReasoningContent = options.EmitHistoryReasoningContent
 	requestCtx.ReportUsageIterations = requestCtx.EmitProtocolPing
 	requestCtx.ReportContextManagement = anthropicBetaHeaderContains(headers, "context-management-2025-06-27")
 	requestCtx.ClientDeclaredExtendedContext = anthropicBetaHeaderHasPrefix(headers, "context-1m")
@@ -3844,6 +3866,11 @@ func mergeKiroAssistantMessages(dst, src *KiroAssistantResponseMessage) {
 	}
 	dst.Content = joinKiroHistoryText(dst.Content, src.Content)
 	dst.ToolUses = append(dst.ToolUses, src.ToolUses...)
+	// Keep a reasoningContent when either side carries one; the latter turn's
+	// signed reasoning is closest to the merged turn's output.
+	if src.ReasoningContent != nil {
+		dst.ReasoningContent = src.ReasoningContent
+	}
 }
 
 func mergeKiroTools(left, right []KiroToolWrapper) []KiroToolWrapper {
@@ -5008,6 +5035,8 @@ func buildAssistantMessageStruct(msg gjson.Result, requestCtx *KiroRequestContex
 	content := msg.Get("content")
 	var contentBuilder strings.Builder
 	var thinkingBuilder strings.Builder
+	var reasoningTextBuilder strings.Builder
+	reasoningSignature := ""
 	var toolUses []KiroToolUse
 
 	if content.IsArray() {
@@ -5019,6 +5048,19 @@ func buildAssistantMessageStruct(msg gjson.Result, requestCtx *KiroRequestContex
 				text := part.Get("thinking").String()
 				if text == "" {
 					text = part.Get("text").String()
+				}
+				// A signed thinking block replays to Kiro as provider-native
+				// reasoningContent, which the official client sends and which
+				// measurably lowers the upstream content-filter stop rate. The
+				// signature carries the reasoning even when the text is empty
+				// (Claude Code stores that for omitted thinking). Unsigned
+				// thinking has no provider token, so it stays inline.
+				if requestCtx != nil && requestCtx.EmitHistoryReasoningContent {
+					if sig := strings.TrimSpace(part.Get("signature").String()); sig != "" {
+						_, _ = reasoningTextBuilder.WriteString(text)
+						reasoningSignature = sig
+						break
+					}
 				}
 				if text != "" {
 					_, _ = thinkingBuilder.WriteString(text)
@@ -5052,12 +5094,22 @@ func buildAssistantMessageStruct(msg gjson.Result, requestCtx *KiroRequestContex
 			finalContent = thinkingStartTag + thinkingText + thinkingEndTag
 		}
 	}
-	if strings.TrimSpace(finalContent) == "" {
+	var reasoning *KiroReasoningContent
+	if reasoningSignature != "" {
+		reasoning = &KiroReasoningContent{ReasoningText: KiroReasoningText{
+			Text:      reasoningTextBuilder.String(),
+			Signature: reasoningSignature,
+		}}
+	}
+	// Kiro rejects an empty assistant turn, but reasoningContent alone is a
+	// valid turn (the official client sends content:"" with reasoningContent).
+	if strings.TrimSpace(finalContent) == "" && reasoning == nil {
 		finalContent = " "
 	}
 	return KiroAssistantResponseMessage{
-		Content:  finalContent,
-		ToolUses: toolUses,
+		Content:          finalContent,
+		ToolUses:         toolUses,
+		ReasoningContent: reasoning,
 	}
 }
 

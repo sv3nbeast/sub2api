@@ -1132,57 +1132,6 @@ func TestParseNonStreamingEventStreamAcceptsKRSResponseFollowedByContextUsageAnd
 	require.Equal(t, "end_turn", result.StopReason)
 }
 
-func TestSemanticTailEOFAcceptsReasoningOnlyWhenThinkingEnabled(t *testing.T) {
-	newStream := func() *bytes.Buffer {
-		return buildKiroSemanticTailEOFStream(t,
-			struct {
-				typ     string
-				payload map[string]any
-			}{"reasoningContentEvent", map[string]any{"reasoningContentEvent": map[string]any{"text": "reasoning tail"}}},
-			struct {
-				typ     string
-				payload map[string]any
-			}{"contextUsageEvent", map[string]any{"contextUsageEvent": map[string]any{"contextUsagePercentage": 50}}},
-		)
-	}
-
-	t.Run("non_stream", func(t *testing.T) {
-		result, err := ParseNonStreamingEventStreamWithContext(newStream(), "claude-opus-5", KiroRequestContext{
-			RequireTerminalEvent:  true,
-			AcceptSemanticTailEOF: true,
-			ThinkingEnabled:       true,
-		})
-
-		require.NoError(t, err)
-		require.NotNil(t, result)
-		require.Contains(t, string(result.ResponseBody), "reasoning tail")
-	})
-
-	t.Run("stream", func(t *testing.T) {
-		var out bytes.Buffer
-		result, err := StreamEventStreamAsAnthropicWithContext(context.Background(), newStream(), &out, "claude-opus-5", 200_000, KiroRequestContext{
-			RequireTerminalEvent:  true,
-			AcceptSemanticTailEOF: true,
-			ThinkingEnabled:       true,
-		})
-
-		require.NoError(t, err)
-		require.NotNil(t, result)
-		require.Contains(t, out.String(), "reasoning tail")
-		require.Equal(t, 1, strings.Count(out.String(), "event: message_stop"))
-	})
-
-	t.Run("thinking_disabled", func(t *testing.T) {
-		result, err := ParseNonStreamingEventStreamWithContext(newStream(), "claude-opus-5", KiroRequestContext{
-			RequireTerminalEvent:  true,
-			AcceptSemanticTailEOF: true,
-		})
-
-		require.Nil(t, result)
-		require.ErrorContains(t, err, "missing completion evidence")
-	})
-}
-
 func TestSemanticTailEOFRequiresOptInAndContextUsageAfterLastOutput(t *testing.T) {
 	event := func(typ string, payload map[string]any) struct {
 		typ     string

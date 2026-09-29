@@ -284,15 +284,18 @@ type nianzsKiroEventDiagnosticState struct {
 }
 
 // nianzsKiroSemanticTailState recognizes the completion shape emitted by both
-// Amazon Q and KRS for some long-context turns: at least one assistant or
-// enabled-reasoning response frame, followed by contextUsageEvent, followed by
-// a frame-aligned clean EOF. The context-usage marker must occur after the last
-// response frame so an earlier progress update cannot turn a later truncated
-// response into a success.
+// Amazon Q and KRS for some long-context turns: assistant output, followed by
+// contextUsageEvent, followed by a frame-aligned clean EOF. The context-usage
+// marker must occur after the last output frame so an earlier progress update
+// cannot turn a later truncated response into a success.
+//
+// The same tail after reasoning alone is not a completed turn: it is how the Q
+// endpoint ends a turn its safety classifier stopped, which KRS reports
+// explicitly as CONTENT_FILTERED.
 type nianzsKiroSemanticTailState struct {
-	sawResponseCandidate        bool
+	sawAssistantOutput          bool
+	sawReasoning                bool
 	contextUsageAfterLastOutput bool
-	allowReasoning              bool
 }
 
 // nianzsKiroIncompleteStreamState classifies only evidence already decoded
@@ -335,8 +338,8 @@ func (s *nianzsKiroIncompleteStreamState) reason() IncompleteStreamReason {
 	return IncompleteStreamReasonMissingTerminal
 }
 
-func newNianzsKiroSemanticTailState(requestCtx KiroRequestContext) *nianzsKiroSemanticTailState {
-	return &nianzsKiroSemanticTailState{allowReasoning: requestCtx.ThinkingEnabled}
+func newNianzsKiroSemanticTailState() *nianzsKiroSemanticTailState {
+	return &nianzsKiroSemanticTailState{}
 }
 
 func (s *nianzsKiroSemanticTailState) observe(msg *eventStreamMessage, event map[string]any, decodeStatus string) {
@@ -349,12 +352,17 @@ func (s *nianzsKiroSemanticTailState) observe(msg *eventStreamMessage, event map
 		return
 	}
 	eventType := strings.TrimSpace(msg.EventType)
-	if nianzsKiroSemanticTailResponseCandidate(eventType, event, s.allowReasoning) {
-		s.sawResponseCandidate = true
+	if nianzsKiroSemanticTailResponseCandidate(eventType, event) {
+		s.sawAssistantOutput = true
 		s.contextUsageAfterLastOutput = false
 		return
 	}
-	if strings.EqualFold(eventType, "contextUsageEvent") && s.sawResponseCandidate {
+	if nianzsKiroSemanticTailReasoning(eventType, event) {
+		s.sawReasoning = true
+		s.contextUsageAfterLastOutput = false
+		return
+	}
+	if strings.EqualFold(eventType, "contextUsageEvent") && (s.sawAssistantOutput || s.sawReasoning) {
 		s.contextUsageAfterLastOutput = true
 		return
 	}
@@ -367,10 +375,16 @@ func (s *nianzsKiroSemanticTailState) observe(msg *eventStreamMessage, event map
 }
 
 func (s *nianzsKiroSemanticTailState) canCompleteAtCleanEOF() bool {
-	return s != nil && s.sawResponseCandidate && s.contextUsageAfterLastOutput
+	return s != nil && s.sawAssistantOutput && s.contextUsageAfterLastOutput
 }
 
-func nianzsKiroSemanticTailResponseCandidate(eventType string, event map[string]any, allowReasoning bool) bool {
+// endedDuringReasoning reports the tail the Q endpoint leaves when it stops a
+// turn during reasoning, before any assistant output.
+func (s *nianzsKiroSemanticTailState) endedDuringReasoning() bool {
+	return s != nil && s.sawReasoning && !s.sawAssistantOutput && s.contextUsageAfterLastOutput
+}
+
+func nianzsKiroSemanticTailResponseCandidate(eventType string, event map[string]any) bool {
 	switch strings.TrimSpace(eventType) {
 	case "assistantResponseEvent":
 		assistant := nestedEvent(event, "assistantResponseEvent")
@@ -383,18 +397,17 @@ func nianzsKiroSemanticTailResponseCandidate(eventType string, event map[string]
 		// promote an unfinished streaming tool fragment merely because context
 		// usage follows it; doing so could synthesize a truncated tool call.
 		return false
-	case "reasoningContentEvent":
-		if !allowReasoning {
-			return false
-		}
-		reasoning := nestedEvent(event, "reasoningContentEvent")
-		if reasoning == nil {
-			reasoning = event
-		}
-		return getString(reasoning, "text") != "" || getString(reasoning, "redactedContent") != ""
 	default:
 		return false
 	}
+}
+
+func nianzsKiroSemanticTailReasoning(eventType string, event map[string]any) bool {
+	if strings.TrimSpace(eventType) != "reasoningContentEvent" {
+		return false
+	}
+	reasoning := nestedEvent(event, "reasoningContentEvent")
+	return getString(reasoning, "text") != "" || getString(reasoning, "redactedContent") != ""
 }
 
 func newNianzsKiroEventDiagnosticState(requestCtx KiroRequestContext) *nianzsKiroEventDiagnosticState {

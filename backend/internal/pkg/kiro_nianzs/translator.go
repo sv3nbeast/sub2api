@@ -159,12 +159,16 @@ type StreamResult struct {
 	Usage         Usage
 	StopReason    string
 	FirstDeltaDur *time.Duration
+	// Refusal is set when the upstream content filter stopped the turn.
+	Refusal *Refusal
 }
 
 type ParseResult struct {
 	ResponseBody []byte
 	Usage        Usage
 	StopReason   string
+	// Refusal is set when the upstream content filter stopped the turn.
+	Refusal *Refusal
 }
 
 type IncompleteStreamReason string
@@ -909,7 +913,7 @@ func ParseNonStreamingEventStreamWithContext(body io.Reader, model string, reque
 	if err != nil {
 		return nil, err
 	}
-	if requestCtx.NativeToolProgressRequired && len(toolUses) == 0 && shouldRetryKiroNativeToolProgress(requestCtx.NativeToolCallMarkerRequired, content) {
+	if reasoningArtifacts.Refusal == nil && requestCtx.NativeToolProgressRequired && len(toolUses) == 0 && shouldRetryKiroNativeToolProgress(requestCtx.NativeToolCallMarkerRequired, content) {
 		return nil, &NativeToolProgressStalledError{KiroCredits: usage.KiroCredits + requestCtx.PriorAttemptKiroCredits}
 	}
 	// Keep the billing usage independent from the provider context percentage.
@@ -933,6 +937,7 @@ func ParseNonStreamingEventStreamWithContext(body io.Reader, model string, reque
 		ResponseBody: buildClaudeResponse(content, toolUses, model, clientUsage, stopReason, reasoningArtifacts, requestCtx),
 		Usage:        usage,
 		StopReason:   stopReason,
+		Refusal:      reasoningArtifacts.Refusal,
 	}, nil
 }
 
@@ -997,8 +1002,9 @@ func StreamEventStreamAsAnthropicWithContext(ctx context.Context, body io.Reader
 	}
 	sawCompletionEvidence := false
 	sawDefinitiveCompletion := false
+	var refusal *Refusal
 	eventDiagnostics := newNianzsKiroEventDiagnosticState(requestCtx)
-	semanticTailState := newNianzsKiroSemanticTailState(requestCtx)
+	semanticTailState := newNianzsKiroSemanticTailState()
 	incompleteStreamState := &nianzsKiroIncompleteStreamState{}
 	protocolPingSent := false
 	lastHiddenThinkingProgressAt := time.Time{}
@@ -2015,10 +2021,18 @@ func StreamEventStreamAsAnthropicWithContext(ctx context.Context, body io.Reader
 		msg, err := readEventStreamMessage(reader)
 		if err == io.EOF {
 			status := "clean_eof"
-			if requestCtx.RequireTerminalEvent && requestCtx.AcceptSemanticTailEOF && !sawCompletionEvidence && semanticTailState.canCompleteAtCleanEOF() {
-				sawCompletionEvidence = true
-				eventDiagnostics.acceptSemanticTailCompletion()
-				status = "semantic_tail_eof"
+			if requestCtx.RequireTerminalEvent && requestCtx.AcceptSemanticTailEOF && !sawCompletionEvidence {
+				if semanticTailState.canCompleteAtCleanEOF() {
+					sawCompletionEvidence = true
+					eventDiagnostics.acceptSemanticTailCompletion()
+					status = "semantic_tail_eof"
+				} else if semanticTailState.endedDuringReasoning() {
+					refusal = inferredKiroReasoningRefusal()
+					stopReason = "refusal"
+					sawCompletionEvidence = true
+					eventDiagnostics.acceptSemanticTailCompletion()
+					status = "reasoning_tail_refusal"
+				}
 			}
 			eventDiagnostics.finish(status)
 			break
@@ -2067,6 +2081,10 @@ func StreamEventStreamAsAnthropicWithContext(ctx context.Context, body io.Reader
 		if definitiveCompletion {
 			sawDefinitiveCompletion = true
 		}
+		if eventRefusal := kiroRefusalFromEvent(msg.EventType, event); eventRefusal != nil {
+			refusal = eventRefusal
+			stopReason = preferAnthropicStopReason(stopReason, "refusal")
+		}
 		// Keep the first Claude-compatible text suffix paced to Claude's native
 		// token-generation window instead of bursting both synthetic deltas when
 		// Kiro delivers the next wire event immediately.
@@ -2107,6 +2125,11 @@ func StreamEventStreamAsAnthropicWithContext(ctx context.Context, body io.Reader
 			Reason:  incompleteStreamState.reason(),
 		}
 	}
+	if refusal != nil {
+		// The refusal cut the reasoning short, so its signature may never have
+		// arrived. Drop an unsigned block instead of failing the refused turn.
+		requestCtx.SuppressUnauthenticatedThinking = true
+	}
 
 	if err := closeOpenStreamingTool(); err != nil {
 		return nil, err
@@ -2129,7 +2152,7 @@ func StreamEventStreamAsAnthropicWithContext(ctx context.Context, body io.Reader
 	if err := flushTextStopBuffer(); err != nil {
 		return nil, err
 	}
-	if requestCtx.NativeToolProgressRequired && !nativeToolEmitted && nativeToolProgressGuard && shouldRetryKiroNativeToolProgress(requestCtx.NativeToolCallMarkerRequired, visibleTextBuf.String()) {
+	if refusal == nil && requestCtx.NativeToolProgressRequired && !nativeToolEmitted && nativeToolProgressGuard && shouldRetryKiroNativeToolProgress(requestCtx.NativeToolCallMarkerRequired, visibleTextBuf.String()) {
 		return nil, &NativeToolProgressStalledError{KiroCredits: usage.KiroCredits}
 	}
 	// 移除"thinking-only 强制 max_tokens"误判分支
@@ -2212,7 +2235,7 @@ func StreamEventStreamAsAnthropicWithContext(ctx context.Context, body io.Reader
 	messageDelta := map[string]any{
 		"type": "message_delta",
 		"delta": map[string]any{
-			"stop_details":  nil,
+			"stop_details":  refusal.stopDetails(),
 			"stop_reason":   stopReason,
 			"stop_sequence": nullableStopSequence(stopSequenceMatched),
 		},
@@ -2232,6 +2255,7 @@ func StreamEventStreamAsAnthropicWithContext(ctx context.Context, body io.Reader
 		Usage:         usage,
 		StopReason:    stopReason,
 		FirstDeltaDur: firstDelta,
+		Refusal:       refusal,
 	}, nil
 }
 
@@ -5202,6 +5226,8 @@ func blockToMap(block gjson.Result) map[string]any {
 type kiroReasoningArtifacts struct {
 	Signature        string
 	RedactedContents []string
+	// Refusal is the upstream content-filter stop that ended the reasoning.
+	Refusal *Refusal
 }
 
 func parseEventStream(body io.Reader, model string, requestCtx KiroRequestContext) (string, []KiroToolUse, Usage, string, kiroReasoningArtifacts, error) {
@@ -5214,7 +5240,7 @@ func parseEventStream(body io.Reader, model string, requestCtx KiroRequestContex
 	sawCompletionEvidence := false
 	sawDefinitiveCompletion := false
 	eventDiagnostics := newNianzsKiroEventDiagnosticState(requestCtx)
-	semanticTailState := newNianzsKiroSemanticTailState(requestCtx)
+	semanticTailState := newNianzsKiroSemanticTailState()
 	incompleteStreamState := &nianzsKiroIncompleteStreamState{}
 	processedIDs := make(map[string]bool)
 	var currentTool *toolUseState
@@ -5231,10 +5257,18 @@ func parseEventStream(body io.Reader, model string, requestCtx KiroRequestContex
 		msg, err := readEventStreamMessage(reader)
 		if err == io.EOF {
 			status := "clean_eof"
-			if requestCtx.RequireTerminalEvent && requestCtx.AcceptSemanticTailEOF && !sawCompletionEvidence && semanticTailState.canCompleteAtCleanEOF() {
-				sawCompletionEvidence = true
-				eventDiagnostics.acceptSemanticTailCompletion()
-				status = "semantic_tail_eof"
+			if requestCtx.RequireTerminalEvent && requestCtx.AcceptSemanticTailEOF && !sawCompletionEvidence {
+				if semanticTailState.canCompleteAtCleanEOF() {
+					sawCompletionEvidence = true
+					eventDiagnostics.acceptSemanticTailCompletion()
+					status = "semantic_tail_eof"
+				} else if semanticTailState.endedDuringReasoning() {
+					reasoningArtifacts.Refusal = inferredKiroReasoningRefusal()
+					stopReason = "refusal"
+					sawCompletionEvidence = true
+					eventDiagnostics.acceptSemanticTailCompletion()
+					status = "reasoning_tail_refusal"
+				}
 			}
 			eventDiagnostics.finish(status)
 			break
@@ -5273,6 +5307,10 @@ func parseEventStream(body io.Reader, model string, requestCtx KiroRequestContex
 		}
 		if sr := normalizeAnthropicStopReason(readStopReason(event)); sr != "" {
 			stopReason = preferAnthropicStopReason(stopReason, sr)
+		}
+		if eventRefusal := kiroRefusalFromEvent(msg.EventType, event); eventRefusal != nil {
+			reasoningArtifacts.Refusal = eventRefusal
+			stopReason = preferAnthropicStopReason(stopReason, "refusal")
 		}
 		completionEvidence := kiroEventProvidesCompletionEvidence(msg.EventType, event)
 		definitiveCompletion := kiroEventProvidesDefinitiveCompletion(msg.EventType, event)
@@ -5366,7 +5404,9 @@ func parseEventStream(body io.Reader, model string, requestCtx KiroRequestContex
 	cleanText, embeddedToolUses, pending := drainEmbeddedToolTextForRequestFinal(content.String(), requestCtx)
 	cleanText += preserveUnparsedToolTail(pending, requestCtx)
 	if requestCtx.RequireProviderThinkingSignature && findRealThinkingStartTag(cleanText, 0) >= 0 && strings.TrimSpace(reasoningArtifacts.Signature) == "" {
-		if !requestCtx.SuppressUnauthenticatedThinking {
+		// A refusal can cut the reasoning off before its signature arrives; drop
+		// the unsigned block rather than failing the refused turn.
+		if !requestCtx.SuppressUnauthenticatedThinking && reasoningArtifacts.Refusal == nil {
 			eventDiagnostics.finish("thinking_signature_missing")
 			return "", nil, usage, stopReason, reasoningArtifacts, eventDiagnostics.parseError("thinking_signature", errors.New("missing provider thinking signature"))
 		}
@@ -5459,6 +5499,9 @@ func normalizeAnthropicStopReason(reason string) string {
 	switch normalized := strings.ToLower(strings.TrimSpace(reason)); normalized {
 	case "end_turn", "tool_use", "max_tokens", "stop_sequence", "pause_turn", "refusal", "model_context_window_exceeded":
 		return normalized
+	case "content_filtered":
+		// Kiro's safety-classifier stop.
+		return "refusal"
 	default:
 		return ""
 	}
@@ -5593,7 +5636,7 @@ func buildClaudeResponse(content string, toolUses []KiroToolUse, model string, u
 		"role":         "assistant",
 		"model":        model,
 		"content":      blocks,
-		"stop_details": nil,
+		"stop_details": reasoningArtifacts.Refusal.stopDetails(),
 		"stop_reason":  stopReason,
 		"usage":        buildKiroClaudeUsageMap(usage),
 	}
@@ -5618,6 +5661,7 @@ func buildClaudeResponse(content string, toolUses []KiroToolUse, model string, u
 			Model        string           `json:"model"`
 			StopReason   string           `json:"stop_reason"`
 			StopSequence string           `json:"stop_sequence,omitempty"`
+			StopDetails  any              `json:"stop_details,omitempty"`
 			Usage        nativeUsage      `json:"usage"`
 		}
 		native := nativeResponse{
@@ -5628,6 +5672,7 @@ func buildClaudeResponse(content string, toolUses []KiroToolUse, model string, u
 			Model:        model,
 			StopReason:   stopReason,
 			StopSequence: stopSequence,
+			StopDetails:  reasoningArtifacts.Refusal.stopDetails(),
 			Usage: nativeUsage{
 				InputTokens:              usage.InputTokens,
 				OutputTokens:             usage.OutputTokens,

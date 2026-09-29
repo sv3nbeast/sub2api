@@ -27,3 +27,12 @@ Documented compatibility hook points:
   layer accepts only that ordered, frame-aligned clean-EOF shape; bare EOF,
   metadata-only turns, unfinished tool input, and output after context usage
   stay strict.
+- Upstream content-filter stops become Anthropic `stop_reason: "refusal"` with
+  `stop_details` (`sub2api_refusal.go`). KRS reports them as a metadataEvent
+  with stopReason CONTENT_FILTERED and stopDetails.refusal; the Amazon Q
+  endpoint ends the same turn after reasoning with only contextUsageEvent and a
+  clean EOF, so that reasoning-only tail is reported as an inferred cyber
+  refusal (KRS reports the same requests as CYBER) rather than a completed
+  turn. Unsigned thinking cut off by a refusal is
+  dropped instead of failing the turn, and a refusal never triggers the native
+  tool progress retry.

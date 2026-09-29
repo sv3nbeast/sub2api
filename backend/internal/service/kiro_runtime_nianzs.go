@@ -595,6 +595,7 @@ func (s *GatewayService) forwardKiroMessagesNianzs(ctx context.Context, c *gin.C
 		_ = resp.Body.Close()
 		if err == nil {
 			cachePlan.commit()
+			nianzsLogKiroRefusal(account, mappedModel, parseResult.Refusal)
 			break
 		}
 		if attempt > 0 || !nianzskiro.IsNativeToolProgressStalled(err) {
@@ -871,6 +872,7 @@ func (s *GatewayService) openKiroAnthropicStreamResponseNianzsWithEstimatedInput
 				_ = pw.Close()
 				if streamResult != nil {
 					nianzsLogKiroContextUsage(account, mappedModel, inputTokens, currentRequestCtx.CompletedToolHistoryFlattened, currentRequestCtx.OldCompletedToolHistoryCompacted, streamResult.Usage)
+					nianzsLogKiroRefusal(account, mappedModel, streamResult.Refusal)
 				}
 				return
 			}
@@ -1643,6 +1645,19 @@ func nianzsLogKiroContextUsage(account *Account, model string, estimatedInputTok
 		zap.Bool("compact_old_completed_tool_history", oldCompletedToolHistoryCompacted),
 		zap.Float64("context_usage_percentage", usage.ContextUsagePercentage),
 		zap.Int("estimated_anthropic_input_tokens", estimatedInputTokens),
+	)
+}
+
+// nianzsLogKiroRefusal records a turn the upstream content filter stopped.
+func nianzsLogKiroRefusal(account *Account, model string, refusal *nianzskiro.Refusal) {
+	if account == nil || refusal == nil {
+		return
+	}
+	logger.L().Warn("kiro.upstream_refusal",
+		zap.Int64("selected_account_id", account.ID),
+		zap.String("model", strings.TrimSpace(model)),
+		zap.String("category", refusal.Category),
+		zap.Bool("inferred", refusal.Inferred),
 	)
 }
 

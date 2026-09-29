@@ -857,6 +857,44 @@ describe('UseKeyModal', () => {
     }
   )
 
+  it('keeps the Kiro implementation detail out of Codex CLI configuration', async () => {
+    const wrapper = mount(UseKeyModal, {
+      props: {
+        show: true,
+        apiKey: 'sk-kiro-test',
+        baseUrl: 'https://example.com/v1',
+        platform: 'kiro'
+      },
+      global: {
+        stubs: {
+          BaseDialog: {
+            template: '<div><slot /><slot name="footer" /></div>'
+          },
+          Icon: {
+            template: '<span />'
+          }
+        }
+      }
+    })
+
+    const codexTab = wrapper.findAll('button').find((button) =>
+      button.text().includes('keys.useKeyModal.cliTabs.codexCli')
+    )
+    expect(codexTab).toBeDefined()
+    await codexTab!.trigger('click')
+    await nextTick()
+
+    const config = wrapper.findAll('pre code')
+      .map((code) => code.text())
+      .find((content) => content.includes('[model_providers.subapis]'))
+
+    expect(config).toBeDefined()
+    expect(config).toContain('# Codex CLI -> SubAPIs group')
+    expect(config).toContain('name = "SubAPIs"')
+    expect(config).not.toContain('Kiro')
+    expect(config).not.toContain('kiro')
+  })
+
   // Scenario: the platform-preferred model remains selected when the downloaded catalog contains it.
   it('keeps the preferred Composite default when it exists in the catalog', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({

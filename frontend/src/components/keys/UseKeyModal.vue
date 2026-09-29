@@ -914,10 +914,16 @@ function generateRoutedCodexFiles(
     composite: 'Composite'
   }
   const label = labels[platform] || platform
+  // Kiro is an internal upstream/account implementation detail. It should
+  // not be exposed in a user-facing Codex configuration file because the
+  // API key may be used with an Anthropic-compatible group and the route can
+  // change without requiring a client configuration change.
+  const providerName = platform === 'kiro' ? 'SubAPIs' : `SubAPIs ${label}`
+  const configComment = platform === 'kiro' ? '# Codex CLI -> SubAPIs group' : `# Codex CLI -> ${providerName} group`
   const envContent = isWindows
     ? `$env:SUB2API_API_KEY="${apiKey}"`
     : `export SUB2API_API_KEY="${apiKey}"`
-  const configContent = `# Codex CLI -> SubAPIs ${label} group
+  const configContent = `${configComment}
 model_provider = "subapis"
 model = "${model}"
 review_model = "${model}"
@@ -925,7 +931,7 @@ ${codexReasoningEffortTomlLine(model)}disable_response_storage = true
 model_catalog_json = "${escapeTomlBasicString(codexModelCatalogPath.value)}"
 
 [model_providers.subapis]
-name = "SubAPIs ${label}"
+name = "${providerName}"
 base_url = "${baseUrl}"
 env_key = "SUB2API_API_KEY"
 wire_api = "responses"

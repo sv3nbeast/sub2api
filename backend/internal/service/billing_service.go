@@ -635,6 +635,19 @@ func (s *BillingService) initFallbackPricing() {
 		LongContextInputMultiplier:         2,
 		LongContextOutputMultiplier:        1.5,
 	}
+	s.fallbackPrices["gpt-6.1-sol"] = &ModelPricing{
+		InputPricePerToken:                 2e-6,
+		InputPricePerTokenPriority:         4e-6,
+		OutputPricePerToken:                10e-6,
+		OutputPricePerTokenPriority:        20e-6,
+		CacheCreationPricePerToken:         2.5e-6,
+		CacheCreationPricePerTokenPriority: 5e-6,
+		CacheReadPricePerToken:             0.1e-6,
+		CacheReadPricePerTokenPriority:     0.2e-6,
+		LongContextInputThreshold:          272_000,
+		LongContextInputMultiplier:         2,
+		LongContextOutputMultiplier:        1.5,
+	}
 	s.fallbackPrices["gpt-6-luna"] = &ModelPricing{
 		InputPricePerToken:                 0.1e-6,
 		InputPricePerTokenPriority:         0.2e-6,
@@ -1267,6 +1280,8 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 			return s.fallbackPrices["gpt-6-astra"]
 		case "gpt-6-sol":
 			return s.fallbackPrices["gpt-6-sol"]
+		case "gpt-6.1-sol":
+			return s.fallbackPrices["gpt-6.1-sol"]
 		case "gpt-6-luna":
 			return s.fallbackPrices["gpt-6-luna"]
 		case "gpt-5.6-sol":
@@ -2019,7 +2034,7 @@ func (s *BillingService) applyModelSpecificPricingPolicyEx(model string, pricing
 func openAIModelFastPricingRatio(normalized string) float64 {
 	switch normalized {
 	case "gpt-5.4", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-		"gpt-6-astra", "gpt-6-sol", "gpt-6-luna":
+		"gpt-6-astra", "gpt-6-sol", "gpt-6.1-sol", "gpt-6-luna":
 		return 2.0
 	case "gpt-5.5":
 		return 2.5

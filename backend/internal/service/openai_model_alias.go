@@ -42,6 +42,8 @@ func normalizeKnownOpenAICodexModel(model string) string {
 		return "gpt-6-astra"
 	case normalized == "gpt-6-sol":
 		return "gpt-6-sol"
+	case normalized == "gpt-6.1-sol":
+		return "gpt-6.1-sol"
 	case normalized == "gpt-6-luna":
 		return "gpt-6-luna"
 	case strings.Contains(normalized, "gpt-5.6-sol"):
@@ -122,6 +124,13 @@ func isOpenAIGPT6SolModel(model string) bool {
 	return canonicalizeOpenAIModelAliasSpelling(model) == "gpt-6-sol"
 }
 
+// isOpenAIGPT61SolModel reports the exact GPT-6.1 Sol upstream model. Its
+// reasoning contract differs from GPT-6 Sol, so it must remain a separate
+// predicate instead of being folded into the older Sol family.
+func isOpenAIGPT61SolModel(model string) bool {
+	return canonicalizeOpenAIModelAliasSpelling(model) == "gpt-6.1-sol"
+}
+
 func isOpenAIGPT6LunaModel(model string) bool {
 	return canonicalizeOpenAIModelAliasSpelling(model) == "gpt-6-luna"
 }
@@ -129,10 +138,11 @@ func isOpenAIGPT6LunaModel(model string) bool {
 // isOpenAIGPT6Model reports any verified GPT-6 family model. Used for the
 // shared GPT-6 wire contract (unsupported sampling parameters, prompt-cache
 // option shape) that the whole generation enforces. Effort handling still
-// differs per model and must not be derived from this helper: Astra rejects
-// "none", while Sol and Luna accept it.
+// differs per model and must not be derived from this helper: Astra and GPT-6.1
+// Sol reject "none", while GPT-6 Sol and Luna accept it.
 func isOpenAIGPT6Model(model string) bool {
-	return isOpenAIGPT6AstraModel(model) || isOpenAIGPT6SolModel(model) || isOpenAIGPT6LunaModel(model)
+	return isOpenAIGPT6AstraModel(model) || isOpenAIGPT6SolModel(model) ||
+		isOpenAIGPT61SolModel(model) || isOpenAIGPT6LunaModel(model)
 }
 
 func appendUsageBillingModelCandidate(candidates []string, seen map[string]struct{}, model string) []string {

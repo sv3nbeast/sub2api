@@ -504,7 +504,7 @@ func newConfiguredCodexModelDescriptor(modelID string) configuredCodexModelDescr
 		descriptor.ServiceTiers = configuredCodexServiceTiersForModel(modelID)
 		if isOpenAICodexReasoningGPTModel(modelID) {
 			defaultReasoningLevel := "medium"
-			if getNormalizedCodexModel(modelID) == "gpt-5.6-sol" {
+			if getNormalizedCodexModel(modelID) == "gpt-5.6-sol" || isOpenAIGPT61SolModel(modelID) {
 				defaultReasoningLevel = "low"
 			}
 			descriptor.DefaultReasoningLevel = &defaultReasoningLevel
@@ -652,6 +652,16 @@ func configuredCodexGPTReasoningLevels(modelID string) []configuredCodexReasonin
 			Effort:      "ultra",
 			Description: "Maximum reasoning with automatic task delegation",
 		})
+	}
+	if isOpenAIGPT61SolModel(modelID) {
+		// GPT-6.1 Sol supports max but has no verified ultra workflow.
+		levels = []configuredCodexReasoningLevel{
+			{Effort: "low", Description: "Fast responses with lighter reasoning"},
+			{Effort: "medium", Description: "Balanced reasoning for most coding tasks"},
+			{Effort: "high", Description: "Greater reasoning depth for coding and agent tasks"},
+			{Effort: "xhigh", Description: "Extra-high reasoning depth for difficult tasks"},
+			{Effort: "max", Description: "Maximum reasoning depth for complex tasks"},
+		}
 	}
 	return levels
 }
@@ -2033,6 +2043,7 @@ func CodexModelsManifestETag(body []byte) string {
 var apiKeyCodexModelsWithoutResponsesLite = map[string]struct{}{
 	"gpt-6-astra":   {},
 	"gpt-6-sol":     {},
+	"gpt-6.1-sol":   {},
 	"gpt-6-luna":    {},
 	"gpt-5.6-sol":   {},
 	"gpt-5.6-terra": {},

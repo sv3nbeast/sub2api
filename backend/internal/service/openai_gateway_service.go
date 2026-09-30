@@ -12167,7 +12167,7 @@ func normalizeOpenAIReasoningEffort(raw string) string {
 }
 
 func normalizeOpenAIReasoningEffortForModel(raw, model string) string {
-	if isOpenAIGPT6AstraModel(model) {
+	if isOpenAIGPT6AstraModel(model) || isOpenAIGPT61SolModel(model) {
 		if effort := strings.ToLower(strings.TrimSpace(raw)); effort == "none" || effort == "minimal" {
 			return "low"
 		}

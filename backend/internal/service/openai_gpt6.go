@@ -38,18 +38,14 @@ func normalizeOpenAIGPT6LegacyCacheOptions(req map[string]any) bool {
 
 // gpt6EffortReplacement 返回该模型需要改写的推理档位替换值，无需改写时返回 ""。
 //
-// "minimal" 不是 GPT-6 的合法档位（三个模型实测均 400，上游提示 "start with low"），
-// 全族统一改写为 "low"。"none" 则按模型区分：官方迁移指南明确 "GPT-6 Astra does not
-// support the none reasoning effort; GPT-6 Sol and Luna do"，因此 Sol / Luna 原样保留，
-// Astra 沿用既有的降级为 "low"（保持 migration 235/236 上线后的行为不变）。
-//
-// isAstra 由调用方预先判定一次，避免在首字节前的热路径上重复归一化模型名。
-func gpt6EffortReplacement(isAstra bool, effort string) string {
+// "minimal" 不是 GPT-6 的合法档位，统一改写为 "low"。"none" 仅对官方确认支持
+// 它的 GPT-6 Sol / Luna 保留；Astra 与 GPT-6.1 Sol 都必须降级为 "low"。
+func gpt6EffortReplacement(model string, effort string) string {
 	switch strings.ToLower(strings.TrimSpace(effort)) {
 	case "minimal":
 		return "low"
 	case "none":
-		if isAstra {
+		if !isOpenAIGPT6SolModel(model) && !isOpenAIGPT6LunaModel(model) {
 			return "low"
 		}
 	}
@@ -64,7 +60,6 @@ func normalizeOpenAIGPT6Request(account *Account, body []byte) ([]byte, bool, er
 	if account == nil || !account.IsOpenAI() || !isOpenAIGPT6Model(model) {
 		return body, false, nil
 	}
-	isAstra := isOpenAIGPT6AstraModel(model)
 	// Valid native requests are the common path: preserve their original bytes
 	// and avoid copying the full (potentially 1M-context) conversation.
 	needsNormalization := false
@@ -76,7 +71,7 @@ func normalizeOpenAIGPT6Request(account *Account, body []byte) ([]byte, bool, er
 	}
 	for _, key := range []string{"reasoning.effort", "reasoning_effort"} {
 		effort := gjson.GetBytes(body, key).String()
-		needsNormalization = needsNormalization || gpt6EffortReplacement(isAstra, effort) != ""
+		needsNormalization = needsNormalization || gpt6EffortReplacement(model, effort) != ""
 	}
 	for _, value := range gjson.GetBytes(body, "include").Array() {
 		needsNormalization = needsNormalization || value.String() == "message.output_text.logprobs"
@@ -112,7 +107,7 @@ func normalizeOpenAIGPT6Request(account *Account, body []byte) ([]byte, bool, er
 			target, _ = req["reasoning"].(map[string]any)
 		}
 		if value, ok := target[key].(string); ok {
-			if replacement := gpt6EffortReplacement(isAstra, value); replacement != "" {
+			if replacement := gpt6EffortReplacement(model, value); replacement != "" {
 				target[key] = replacement
 				changed = true
 			}

@@ -14,10 +14,10 @@ describe('useModelWhitelist', () => {
       expect.objectContaining({ from: 'gpt-6-astra', to: 'gpt-6-astra' })
     ]))
   })
-  it('exposes verified GPT-6 Sol/Luna on OpenAI only', () => {
+  it('exposes verified GPT-6 Sol variants on OpenAI only', () => {
     // 2026-09-23 实测：ChatGPT OAuth Responses 接受两者并原样回显；
     // Kiro generateAssistantResponse 对两者均返回 400 INVALID_MODEL_ID。
-    for (const model of ['gpt-6-sol', 'gpt-6-luna']) {
+    for (const model of ['gpt-6-sol', 'gpt-6.1-sol', 'gpt-6-luna']) {
       expect(getModelsByPlatform('openai')).toContain(model)
       expect(getModelsByPlatform('kiro')).not.toContain(model)
       expect(getPresetMappingsByPlatform('openai')).toEqual(expect.arrayContaining([
@@ -104,12 +104,14 @@ describe('useModelWhitelist', () => {
     ]))
     expect(models).toContain('gpt-6')
     expect(models).toContain('gpt-6-astra')
+    expect(models).toContain('gpt-6.1-sol')
   })
 
   it('openai 预设映射包含 GPT-6 别名和 Astra', () => {
     expect(getPresetMappingsByPlatform('openai')).toEqual(expect.arrayContaining([
       expect.objectContaining({ label: 'GPT-6', from: 'gpt-6', to: 'gpt-6' }),
-      expect.objectContaining({ label: 'GPT-6 Astra', from: 'gpt-6-astra', to: 'gpt-6-astra' })
+      expect.objectContaining({ label: 'GPT-6 Astra', from: 'gpt-6-astra', to: 'gpt-6-astra' }),
+      expect.objectContaining({ label: 'GPT-6.1 Sol', from: 'gpt-6.1-sol', to: 'gpt-6.1-sol' })
     ]))
   })
 

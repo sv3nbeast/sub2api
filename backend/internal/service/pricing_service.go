@@ -51,6 +51,16 @@ var (
 		SupportsServiceTier: true, SupportsPromptCaching: true,
 		LiteLLMProvider: "openai", Mode: "chat",
 	}
+	openAIGPT61SolFallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken: 2e-6, OutputCostPerToken: 10e-6,
+		CacheCreationInputTokenCost: 2.5e-6, CacheReadInputTokenCost: 0.1e-6,
+		InputCostPerTokenPriority: 4e-6, OutputCostPerTokenPriority: 20e-6,
+		CacheCreationInputTokenCostPriority: 5e-6, CacheReadInputTokenCostPriority: 0.2e-6,
+		LongContextInputTokenThreshold: 272000,
+		LongContextInputCostMultiplier: 2, LongContextOutputCostMultiplier: 1.5,
+		SupportsServiceTier: true, SupportsPromptCaching: true,
+		LiteLLMProvider: "openai", Mode: "chat",
+	}
 	openAIGPT6LunaFallbackPricing = &LiteLLMModelPricing{
 		InputCostPerToken: 0.1e-6, OutputCostPerToken: 0.5e-6,
 		CacheCreationInputTokenCost: 0.125e-6, CacheReadInputTokenCost: 0.01e-6,
@@ -1546,6 +1556,11 @@ func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
 			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-6-sol(static)"))
 		return openAIGPT6SolFallbackPricing
 	}
+	if isOpenAIGPT61SolModel(model) {
+		logger.With(zap.String("component", "service.pricing")).
+			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-6.1-sol(static)"))
+		return openAIGPT61SolFallbackPricing
+	}
 	if isOpenAIGPT6LunaModel(model) {
 		logger.With(zap.String("component", "service.pricing")).
 			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-6-luna(static)"))
@@ -1795,6 +1810,7 @@ func localChannelPricingModelNamesByProvider(provider string) []string {
 		return []string{
 			"gpt-6-astra",
 			"gpt-6-sol",
+			"gpt-6.1-sol",
 			"gpt-6-luna",
 			"gpt-5.1",
 			"gpt-5.1-codex",

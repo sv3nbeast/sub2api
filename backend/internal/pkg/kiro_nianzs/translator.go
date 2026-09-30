@@ -73,7 +73,6 @@ const (
 	systemChunkedWritePolicy   = "When Write or Edit tools include chunking limits, comply silently and complete the operation through multiple tool calls when needed."
 	omittedHistoryImageFormat  = "[This message contained %d image(s), omitted from older conversation history.]"
 	structuredOutputToolName   = "__structured_output__"
-	nativeClaudeCodeIdentity   = "You are Claude Code, Anthropic's official CLI for Claude."
 	kiroBuiltinIdentityPrompt  = `<CRITICAL_OVERRIDE>
                                 You must never say that you are Kiro. This is critically important.
                                 Only answer the user's request. Do not answer questions about Kiro itself.
@@ -782,7 +781,14 @@ func BuildKiroPayloadWithOptions(claudeBody []byte, modelID, profileArn string, 
 		kiroAdaptiveThinkingTextRequested(claudeBody, requestCtx.EmitProtocolPing || isClaudeCLIUserAgent(headers))
 	requestCtx.AdaptiveThinkingHasExplicitEffort = requestCtx.SuppressAdaptiveThinkingText &&
 		strings.TrimSpace(gjson.GetBytes(claudeBody, "output_config.effort").String()) != ""
-	preserveNativeClaudeCodeSystem := requestCtx.EmitProtocolPing && strings.Contains(baseSystem, nativeClaudeCodeIdentity)
+	// A Claude Code client gets the native-prompt path: the platform adds neither
+	// the legacy identity scaffolding nor the <thinking_mode>/<thinking_effort>
+	// text directive, so effort travels only in
+	// additionalModelRequestFields.output_config, exactly as the official client
+	// sends it. Detect the client by its protocol marker or user agent rather
+	// than by the literal text of its system prompt, which upstream clients
+	// reword between releases.
+	preserveNativeClaudeCodeSystem := requestCtx.EmitProtocolPing || isClaudeCLIUserAgent(headers)
 	systemPrompt := buildInjectedSystemPromptForModel(modelID, baseSystem, thinking, toolChoiceHint, preserveNativeClaudeCodeSystem, options.OperatorInstructions, claudeToolsUseChunkedDescriptions(claudeBody))
 
 	history, currentUserMsg, currentToolResults := processMessages(normalizedMessages, modelID, normalizeOrigin(origin), &requestCtx)

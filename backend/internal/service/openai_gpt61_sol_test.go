@@ -42,14 +42,16 @@ func TestGPT61SolModelContract(t *testing.T) {
 
 	descriptor := newConfiguredCodexModelDescriptor(model)
 	require.Equal(t, "GPT-6.1 Sol", descriptor.DisplayName)
-	require.EqualValues(t, configuredCodexGPT6InputContext, descriptor.ContextWindow)
-	require.EqualValues(t, configuredCodexGPT6InputContext, descriptor.MaxContextWindow)
+	require.EqualValues(t, 272000, descriptor.ContextWindow)
+	require.EqualValues(t, 872000, descriptor.MaxContextWindow)
+	require.Equal(t, "xhigh", *descriptor.MultiAgentReasoningEffort)
 	require.Equal(t, []configuredCodexReasoningLevel{
 		{Effort: "low", Description: "Fast responses with lighter reasoning"},
 		{Effort: "medium", Description: "Balanced reasoning for most coding tasks"},
 		{Effort: "high", Description: "Greater reasoning depth for coding and agent tasks"},
 		{Effort: "xhigh", Description: "Extra-high reasoning depth for difficult tasks"},
 		{Effort: "max", Description: "Maximum reasoning depth for complex tasks"},
+		{Effort: "ultra", Description: "Maximum reasoning with automatic task delegation"},
 	}, descriptor.SupportedReasoningLevels)
 }
 
@@ -67,16 +69,21 @@ func TestGPT61SolProtocolForwarders(t *testing.T) {
 				account := &Account{ID: 7, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Concurrency: 1,
 					Credentials: map[string]any{"access_token": "test-token", "chatgpt_account_id": "test-account"}}
 				payload := map[string]any{"model": "gpt-6.1-sol", "stream": stream, "reasoning": map[string]any{"effort": "max"}}
+				parameters := map[string]any{"type": "object", "properties": map[string]any{"value": map[string]any{"type": "string"}}, "required": []string{"value"}}
+				function := map[string]any{"name": "probe_echo", "description": "Echo the given value", "parameters": parameters}
+				payload["tools"] = []any{map[string]any{"type": "function", "name": "probe_echo", "description": "Echo the given value", "parameters": parameters}}
 				path := "/v1/responses"
 				if protocol == "responses" {
 					payload["input"] = "hello"
 				} else {
 					payload["messages"] = []any{map[string]any{"role": "user", "content": "hello"}}
 					payload["reasoning_effort"] = "max"
+					payload["tools"] = []any{map[string]any{"type": "function", "function": function}}
 					path = "/v1/chat/completions"
 					if protocol == "messages" {
 						payload["max_tokens"] = 128
 						payload["output_config"] = map[string]any{"effort": "max"}
+						payload["tools"] = []any{map[string]any{"name": "probe_echo", "description": "Echo the given value", "input_schema": parameters}}
 						path = "/v1/messages"
 					}
 				}
@@ -100,7 +107,10 @@ func TestGPT61SolProtocolForwarders(t *testing.T) {
 				require.NotNil(t, result)
 				require.Equal(t, "gpt-6.1-sol", gjson.GetBytes(upstream.lastBody, "model").String())
 				require.Equal(t, "max", gjson.GetBytes(upstream.lastBody, "reasoning.effort").String())
+				require.Equal(t, "probe_echo", gjson.GetBytes(upstream.lastBody, "tools.0.name").String())
+				require.Equal(t, "string", gjson.GetBytes(upstream.lastBody, "tools.0.parameters.properties.value.type").String())
 				require.Contains(t, rec.Body.String(), "world")
+				require.Contains(t, rec.Body.String(), "probe_echo")
 				if stream {
 					terminal := "\"type\":\"response.completed\""
 					if protocol == "chat" {

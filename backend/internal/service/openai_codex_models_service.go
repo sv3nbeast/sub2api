@@ -516,7 +516,7 @@ func newConfiguredCodexModelDescriptor(modelID string) configuredCodexModelDescr
 			}
 			if isOpenAIGPT6Model(modelID) {
 				descriptor.MultiAgentVersion = "v2"
-				if isOpenAIGPT6AstraModel(modelID) {
+				if isOpenAIGPT6AstraModel(modelID) || isOpenAIGPT61SolModel(modelID) {
 					// Codex resolves the Ultra workflow to this effort before inference.
 					// openai/codex a9896da3: codex-rs/models-manager/models.json.
 					// 上游 manifest（2026-09-23 实测）只有 Astra 带该字段，
@@ -531,6 +531,12 @@ func newConfiguredCodexModelDescriptor(modelID string) configuredCodexModelDescr
 				// Sol / Luna 与 Astra 同为 1,050,000 整窗 / 922,000 最大输入，沿用同一策略。
 				descriptor.ContextWindow = configuredCodexGPT6InputContext
 				descriptor.MaxContextWindow = configuredCodexGPT6InputContext
+				if isOpenAIGPT61SolModel(modelID) {
+					// Native Codex manifest verified 2026-09-30. Its usable
+					// window differs from the public API's total context.
+					descriptor.ContextWindow = 272000
+					descriptor.MaxContextWindow = 872000
+				}
 			}
 		}
 		if SupportsVerbosity(modelID) {
@@ -646,22 +652,12 @@ func configuredCodexGPTReasoningLevels(modelID string) []configuredCodexReasonin
 	}
 	// Ultra 只属于上游 manifest 明确声明的模型（2026-09-23 实测：Astra / Sol 有，
 	// Luna 没有）。未声明的模型广播 ultra 会让客户端发出上游拒绝的档位。
-	if isOpenAIGPT6AstraModel(modelID) || isOpenAIGPT6SolModel(modelID) ||
+	if isOpenAIGPT6AstraModel(modelID) || isOpenAIGPT6SolModel(modelID) || isOpenAIGPT61SolModel(modelID) ||
 		normalized == "gpt-5.6-sol" || normalized == "gpt-5.6-terra" {
 		levels = append(levels, configuredCodexReasoningLevel{
 			Effort:      "ultra",
 			Description: "Maximum reasoning with automatic task delegation",
 		})
-	}
-	if isOpenAIGPT61SolModel(modelID) {
-		// GPT-6.1 Sol supports max but has no verified ultra workflow.
-		levels = []configuredCodexReasoningLevel{
-			{Effort: "low", Description: "Fast responses with lighter reasoning"},
-			{Effort: "medium", Description: "Balanced reasoning for most coding tasks"},
-			{Effort: "high", Description: "Greater reasoning depth for coding and agent tasks"},
-			{Effort: "xhigh", Description: "Extra-high reasoning depth for difficult tasks"},
-			{Effort: "max", Description: "Maximum reasoning depth for complex tasks"},
-		}
 	}
 	return levels
 }

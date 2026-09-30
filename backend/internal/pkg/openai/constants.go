@@ -26,7 +26,8 @@ var DefaultModels = []Model{
 	{ID: "gpt-5.6-luna", Object: "model", Created: 1780876800, OwnedBy: "openai", Type: "model", DisplayName: "GPT-5.6 Luna"},
 	{ID: "gpt-6-astra", Object: "model", Created: 1788480000, OwnedBy: "openai", Type: "model", DisplayName: "GPT-6 Astra"},
 	{ID: "gpt-6-sol", Object: "model", Created: 1790035200, OwnedBy: "openai", Type: "model", DisplayName: "GPT-6 Sol"},
-	{ID: "gpt-6.1-sol", Object: "model", Created: 1777507200, OwnedBy: "openai", Type: "model", DisplayName: "GPT-6.1 Sol"},
+	// Created records catalog availability, not the model's knowledge cutoff.
+	{ID: "gpt-6.1-sol", Object: "model", Created: 1790726400, OwnedBy: "openai", Type: "model", DisplayName: "GPT-6.1 Sol"},
 	{ID: "gpt-6-luna", Object: "model", Created: 1790035200, OwnedBy: "openai", Type: "model", DisplayName: "GPT-6 Luna"},
 	{ID: "gpt-5.5", Object: "model", Created: 1776873600, OwnedBy: "openai", Type: "model", DisplayName: "GPT-5.5"},
 	{ID: "gpt-5.4", Object: "model", Created: 1738368000, OwnedBy: "openai", Type: "model", DisplayName: "GPT-5.4"},
@@ -159,7 +160,7 @@ func CanonicalizeOpenAIModelAliasSpelling(model string) string {
 func CodexBaseInstructionsForModel(model string) string {
 	canonical := CanonicalizeOpenAIModelAliasSpelling(model)
 	switch {
-	case canonical == "gpt-6" || strings.HasPrefix(canonical, "gpt-6-") || strings.HasPrefix(canonical, "gpt-6."):
+	case canonical == "gpt-6" || strings.HasPrefix(canonical, "gpt-6-") || canonical == "gpt-6.1-sol":
 		if v := strings.TrimSpace(instructionsGPT6Astra); v != "" {
 			return instructionsGPT6Astra
 		}

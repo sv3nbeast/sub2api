@@ -66,6 +66,7 @@ func accountCodexToolCapabilities(account *Account, modelID string) map[string]j
 	// 2026-09-23 实测上游 Codex manifest：Astra / Sol / Luna 三者的这组能力值完全一致
 	// （supports_search_tool=true、apply_patch_tool_type=freeform、comp_hash=3000、
 	// OAuth 下 tool_mode=code_mode_only、use_responses_lite=true）。
+	// GPT-6.1 Sol 的同组字段已由 2026-09-30 原生 manifest 确认。
 	if account.IsOpenAI() && isOpenAIGPT6Model(modelID) && official {
 		defaults := map[string]json.RawMessage{
 			"supports_search_tool":  json.RawMessage("true"),

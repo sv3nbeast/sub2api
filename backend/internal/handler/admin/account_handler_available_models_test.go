@@ -38,6 +38,23 @@ func setupAvailableModelsRouter(adminSvc service.AdminService) *gin.Engine {
 	return router
 }
 
+func TestAccountHandlerGetKiroDefaultModelMapping_Sonnet55(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	handler := NewAccountHandler(newStubAdminService(), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	router.GET("/api/v1/admin/accounts/kiro/default-model-mapping", handler.GetKiroDefaultModelMapping)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/kiro/default-model-mapping", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	var response struct {
+		Data map[string]string `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	for _, alias := range []string{"claude-sonnet-5-5", "claude-sonnet-5.5", "claude-sonnet-5-5-thinking", "claude-sonnet-5.5-thinking"} {
+		require.Equal(t, "claude-sonnet-5.5", response.Data[alias], alias)
+	}
+}
+
 type syncUpstreamHTTPUpstream struct {
 	resp      *http.Response
 	responses []*http.Response
@@ -364,6 +381,8 @@ func TestAccountHandlerGetAvailableModels_KiroOAuthFallsBackToDefaults(t *testin
 		ids = append(ids, model.ID)
 	}
 	require.True(t, slices.Contains(ids, "claude-sonnet-5"))
+	require.True(t, slices.Contains(ids, "claude-sonnet-5-5"))
+	require.True(t, slices.Contains(ids, "claude-sonnet-5-5-thinking"))
 	require.True(t, slices.Contains(ids, "claude-opus-4-7"))
 	require.True(t, slices.Contains(ids, "claude-sonnet-4-6"))
 	require.True(t, slices.Contains(ids, "claude-sonnet-4-6-thinking"))

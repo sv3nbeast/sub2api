@@ -105,6 +105,11 @@ describe('APIKeyGroupTemplatesEditor', () => {
     expect(content.provider.anthropic.models['claude-opus-5-thinking'].options.thinking).toEqual({ type: 'adaptive' })
     expect(content.provider.anthropic.models['claude-opus-5-thinking'].options.thinking).not.toHaveProperty('budgetTokens')
     expect(content.provider.anthropic.models['claude-sonnet-5'].limit.context).toBe(1000000)
+    for (const model of ['claude-sonnet-5-5', 'claude-sonnet-5-5-thinking']) {
+      expect(content.provider.anthropic.models[model].limit).toEqual({ context: 1000000, output: 128000 })
+      expect(content.provider.anthropic.models[model].options.thinking).toEqual({ type: 'adaptive' })
+      expect(content.provider.anthropic.models[model].options.thinking).not.toHaveProperty('budgetTokens')
+    }
   })
 
   it('updates valid hardcoded JSON and blocks invalid drafts', async () => {

@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/api/admin/accounts', () => ({
-  getAntigravityDefaultModelMapping: vi.fn()
+  getAntigravityDefaultModelMapping: vi.fn(),
+  getKiroDefaultModelMapping: vi.fn().mockRejectedValue(new Error('offline'))
 }))
 
-import { buildModelMappingObject, getModelsByPlatform, getPresetMappingsByPlatform, splitModelMappingObject } from '../useModelWhitelist'
+import { buildModelMappingObject, fetchKiroDefaultMappings, getModelsByPlatform, getPresetMappingsByPlatform, splitModelMappingObject } from '../useModelWhitelist'
 
 describe('useModelWhitelist', () => {
   it('exposes verified Astra on OpenAI only', () => {
@@ -26,6 +27,31 @@ describe('useModelWhitelist', () => {
     }
     // gpt-6-terra 不存在于上游，不得出现在任何平台列表里。
     expect(getModelsByPlatform('openai')).not.toContain('gpt-6-terra')
+  })
+
+  it('exposes Sonnet 5.5 only on verified Claude and Kiro providers', () => {
+    for (const model of ['claude-sonnet-5-5', 'claude-sonnet-5-5-thinking']) {
+      for (const platform of ['claude', 'kiro']) {
+        expect(getModelsByPlatform(platform)).toContain(model)
+        expect(getPresetMappingsByPlatform(platform)).toEqual(expect.arrayContaining([
+          expect.objectContaining({ from: model, to: platform === 'kiro' ? 'claude-sonnet-5.5' : 'claude-sonnet-5-5' })
+        ]))
+      }
+      for (const platform of ['antigravity', 'bedrock', 'cursor']) {
+        expect(getModelsByPlatform(platform)).not.toContain(model)
+        expect(getPresetMappingsByPlatform(platform)).not.toEqual(expect.arrayContaining([expect.objectContaining({ from: model })]))
+      }
+    }
+  })
+
+  it('keeps Sonnet 5.5 in the create/edit default-mapping fallback', async () => {
+    const mappings = await fetchKiroDefaultMappings()
+    expect(mappings).toEqual(expect.arrayContaining([
+      { from: 'claude-sonnet-5-5', to: 'claude-sonnet-5.5' },
+      { from: 'claude-sonnet-5-5-thinking', to: 'claude-sonnet-5.5' }
+    ]))
+    mappings[0].to = 'mutated'
+    expect((await fetchKiroDefaultMappings())[0].to).not.toBe('mutated')
   })
 
   it('Opus 5.5 在直连 Claude 与 Kiro 上暴露，Antigravity 不暴露', () => {

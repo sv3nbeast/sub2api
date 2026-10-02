@@ -12,6 +12,9 @@ type anthropicModelMappingResult struct {
 }
 
 var defaultAnthropicModelAliases = map[string]string{
+	"claude-sonnet-5.5":          "claude-sonnet-5-5",
+	"claude-sonnet-5-5-thinking": "claude-sonnet-5-5",
+	"claude-sonnet-5.5-thinking": "claude-sonnet-5-5",
 	// Opus 5.5 只有一个官方 ID；带点写法与 -thinking 后缀做容错归一。
 	// 该模型 thinking 无法关闭（实测 thinking.disabled / budget_tokens 均 400），
 	// 因此 -thinking 别名按 adaptive 处理，与 Opus 5 一致。
@@ -46,7 +49,8 @@ func anthropicThinkingModeForAlias(model string) string {
 		return ""
 	}
 	switch trimmed {
-	case "claude-opus-5-thinking",
+	case "claude-sonnet-5-5-thinking", "claude-sonnet-5.5-thinking",
+		"claude-opus-5-thinking",
 		"claude-opus-5-5-thinking", "claude-opus-5.5-thinking":
 		return "adaptive"
 	case "claude-opus-4-6-thinking", "claude-opus-4.6-thinking",

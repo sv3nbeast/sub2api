@@ -241,6 +241,8 @@ function defaultModels(groupID: number): Record<string, unknown> {
       return {
         "claude-fable-5-1": { name: "Claude Fable 5.1", limit: { context: 1048576, output: 32000 }, options: { thinking: { type: "adaptive" } } },
         "claude-fable-5": { name: "Claude Fable 5", limit: { context: 1048576, output: 128000 } },
+        "claude-sonnet-5-5": { name: "Claude Sonnet 5.5", limit: { context: 1000000, output: 128000 }, options: { thinking: { type: "adaptive" } } },
+        "claude-sonnet-5-5-thinking": { name: "Claude Sonnet 5.5 (Thinking)", limit: { context: 1000000, output: 128000 }, options: { thinking: { type: "adaptive" } } },
         "claude-sonnet-5": { name: "Claude Sonnet 5", limit: { context: 1000000, output: 128000 } },
         "claude-opus-5-5": { name: "Claude Opus 5.5", limit: { context: 1000000, output: 128000 }, options: { thinking: { type: "adaptive" } } },
         "claude-opus-5-5-thinking": { name: "Claude Opus 5.5 (Thinking)", limit: { context: 1000000, output: 128000 }, options: { thinking: { type: "adaptive" } } },

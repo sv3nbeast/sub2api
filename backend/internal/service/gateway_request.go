@@ -1431,8 +1431,8 @@ func FilterSignatureSensitiveBlocksForRetry(body []byte, mappedModel string) []b
 
 // filterThinkingBlocksInternal removes invalid thinking blocks from request
 // 策略：
-//   - 当 thinking.type 不是 "enabled"/"adaptive"：移除所有 thinking 相关块
-//   - 当 thinking.type 是 "enabled"/"adaptive"：仅移除缺失/无效 signature 的 thinking 块
+//   - 当 thinking.type 不是 "enabled"/"adaptive"/"between_tools"：移除所有 thinking 相关块
+//   - 当 thinking.type 是以上模式之一：仅移除缺失/无效 signature 的 thinking 块
 func filterThinkingBlocksInternal(body []byte, _ bool) []byte {
 	// Fast path: if body doesn't contain "thinking", skip parsing
 	if !bytes.Contains(body, []byte(`"type":"thinking"`)) &&
@@ -1452,7 +1452,7 @@ func filterThinkingBlocksInternal(body []byte, _ bool) []byte {
 	// Check if thinking is enabled
 	thinkingEnabled := false
 	if thinking, ok := req["thinking"].(map[string]any); ok {
-		if thinkType, ok := thinking["type"].(string); ok && (thinkType == "enabled" || thinkType == "adaptive") {
+		if thinkType, ok := thinking["type"].(string); ok && (thinkType == "enabled" || thinkType == "adaptive" || thinkType == "between_tools") {
 			thinkingEnabled = true
 		}
 	}

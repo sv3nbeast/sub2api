@@ -1314,6 +1314,8 @@ func TestNianzsKiroMinimumCacheableTokens(t *testing.T) {
 		"claude-opus-5-5-thinking":            4096,
 		"claude-opus-4-5-20251101":            4096,
 		"claude-opus-4-5-20251101-thinking":   4096,
+		"claude-sonnet-5-5": 512,
+		"claude-sonnet-5-5-thinking": 512,
 		"claude-sonnet-5":                     1024,
 		"claude-sonnet-5-thinking":            1024,
 		"claude-sonnet-4-6":                   1024,

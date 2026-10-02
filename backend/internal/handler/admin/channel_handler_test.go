@@ -655,3 +655,31 @@ func TestGetModelDefaultPricing_OmitsUnsupportedCache1hPrice(t *testing.T) {
 	require.True(t, body.Data.Found)
 	require.Nil(t, body.Data.CacheWrite1hPrice)
 }
+
+func TestGetModelDefaultPricing_Sonnet55OfficialCacheBreakdown(t *testing.T) {
+	router := setupModelDefaultPricingRouter()
+	for _, model := range []string{"claude-sonnet-5-5", "claude-sonnet-5.5", "claude-sonnet-5-5-thinking", "claude-sonnet-5.5-thinking"} {
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/channels/model-pricing?model="+model, nil))
+		require.Equal(t, http.StatusOK, w.Code)
+		var body struct {
+			Data struct {
+				Found   bool     `json:"found"`
+				Input   float64  `json:"input_price"`
+				Output  float64  `json:"output_price"`
+				Read    float64  `json:"cache_read_price"`
+				Write5m *float64 `json:"cache_write_5m_price"`
+				Write1h *float64 `json:"cache_write_1h_price"`
+			} `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+		require.True(t, body.Data.Found)
+		require.InDelta(t, 2e-6, body.Data.Input, 1e-14)
+		require.InDelta(t, 10e-6, body.Data.Output, 1e-14)
+		require.InDelta(t, .2e-6, body.Data.Read, 1e-14)
+		require.NotNil(t, body.Data.Write5m)
+		require.NotNil(t, body.Data.Write1h)
+		require.InDelta(t, 2.5e-6, *body.Data.Write5m, 1e-14)
+		require.InDelta(t, 4e-6, *body.Data.Write1h, 1e-14)
+	}
+}

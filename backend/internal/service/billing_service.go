@@ -510,6 +510,13 @@ func (s *BillingService) initFallbackPricing() {
 		SupportsCacheBreakdown:     true,
 	}
 
+	// Sonnet 5.5: official flat rates, including full 1M context.
+	s.fallbackPrices["claude-sonnet-5-5"] = &ModelPricing{
+		InputPricePerToken: 2e-6, OutputPricePerToken: 10e-6,
+		CacheCreationPricePerToken: 2.5e-6, CacheReadPricePerToken: .2e-6,
+		CacheCreation5mPrice: 2.5e-6, CacheCreation1hPrice: 4e-6, SupportsCacheBreakdown: true,
+	}
+
 	// Claude Sonnet 5 (promotional pricing through 2026-08-31)
 	s.fallbackPrices["claude-sonnet-5"] = &ModelPricing{
 		InputPricePerToken:         2e-6,   // $2 per MTok
@@ -1110,6 +1117,9 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 		return s.fallbackPrices["claude-3-opus"]
 	}
 	if strings.Contains(modelLower, "sonnet") {
+		if strings.Contains(modelLower, "sonnet-5-5") || strings.Contains(modelLower, "sonnet-5.5") {
+			return s.fallbackPrices["claude-sonnet-5-5"]
+		}
 		if strings.Contains(modelLower, "sonnet-5") || strings.Contains(modelLower, "sonnet 5") {
 			return s.fallbackPrices["claude-sonnet-5"]
 		}

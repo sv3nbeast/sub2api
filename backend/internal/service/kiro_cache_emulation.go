@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/anthropictokenizer"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	kiropkg "github.com/Wei-Shaw/sub2api/internal/pkg/kiro"
 )
 
@@ -1045,6 +1046,9 @@ func kiroCacheCredentialIdentity(account *Account) string {
 }
 
 func kiroMinimumCacheableTokens(model string) int {
+	if claude.IsSonnet55Model(model) {
+		return 512
+	}
 	m := strings.ToLower(model)
 	switch {
 	case strings.Contains(m, "opus"):

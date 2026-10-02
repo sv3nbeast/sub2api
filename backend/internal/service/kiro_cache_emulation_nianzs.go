@@ -21,6 +21,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/anthropictokenizer"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	nianzskiro "github.com/Wei-Shaw/sub2api/internal/pkg/kiro_nianzs"
 )
 
@@ -1088,6 +1089,9 @@ func nianzsKiroCacheCredentialIdentity(account *Account) string {
 // 子串以覆盖 -thinking 与带日期后缀的变体。
 // 各模型的期望值由 TestKiroMinimumCacheableTokens 钉死。
 func nianzsKiroMinimumCacheableTokens(model string) int {
+	if claude.IsSonnet55Model(model) {
+		return 512
+	}
 	if nianzskiro.IsKiroGPTModel(model) {
 		return nianzsKiroCacheMinTokensGPT
 	}

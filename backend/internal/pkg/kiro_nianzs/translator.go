@@ -27,6 +27,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/anthropictokenizer"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/google/uuid"
 	pdf "github.com/ledongthuc/pdf"
 	"github.com/tidwall/gjson"
@@ -543,6 +544,8 @@ func MapModel(model string) string {
 		return "claude-opus-5.5"
 	case "claude-opus-5", "claude-opus-5-thinking":
 		return "claude-opus-5"
+	case "claude-sonnet-5-5", "claude-sonnet-5-5-thinking", "claude-sonnet-5.5", "claude-sonnet-5.5-thinking":
+		return "claude-sonnet-5.5"
 	case "claude-sonnet-5", "claude-sonnet-5-thinking":
 		return "claude-sonnet-5"
 	case "claude-sonnet-4-6", "claude-sonnet-4-6-thinking", "claude-sonnet-4.6":
@@ -604,7 +607,8 @@ func normalizeClaudeVersionNumber(model string) string {
 // 也不会改写 inferenceConfig,避免改变上游请求语义。
 func requiresImplicitThinkingTagStripping(modelID string) bool {
 	switch strings.TrimSpace(strings.ToLower(modelID)) {
-	case "claude-opus-4.7", "claude-opus-4-7", "claude-opus-4-7-thinking",
+	case "claude-sonnet-5.5", "claude-sonnet-5-5", "claude-sonnet-5-5-thinking", "claude-sonnet-5.5-thinking",
+		"claude-opus-4.7", "claude-opus-4-7", "claude-opus-4-7-thinking",
 		"claude-opus-4.8", "claude-opus-4-8", "claude-opus-4-8-thinking",
 		"claude-opus-5", "claude-opus-5-thinking",
 		"claude-opus-5.5", "claude-opus-5-5", "claude-opus-5-5-thinking":
@@ -641,6 +645,7 @@ func kiroMaxOutputTokensForModel(model string) int {
 	switch normalized {
 	// Opus 4.7 / 4.8 / 5 与 Kiro GPT-5.6 精确模型上限 128000（对齐 Kiro 官方规格）。
 	case "claude-opus-4-8", "claude-opus-4.8", "claude-opus-4-7", "claude-opus-4.7",
+		"claude-sonnet-5-5", "claude-sonnet-5.5",
 		"claude-opus-5", "claude-opus-5-5", "claude-opus-5.5",
 		"gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna":
 		return 128000
@@ -666,6 +671,7 @@ func contextWindowTokensForModel(model string) int {
 	switch normalizeModelAlias(normalized) {
 	case "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
 		"claude-opus-5", "claude-opus-5-5", "claude-opus-5.5",
+		"claude-sonnet-5-5", "claude-sonnet-5.5",
 		"claude-sonnet-5", "claude-sonnet-5.0",
 		"claude-sonnet-4-6", "claude-sonnet-4.6",
 		"claude-opus-4-6", "claude-opus-4.6",
@@ -699,6 +705,7 @@ func BuildKiroPayloadWithContext(claudeBody []byte, modelID, profileArn, origin 
 }
 
 func BuildKiroPayloadWithOptions(claudeBody []byte, modelID, profileArn string, headers http.Header, options KiroPayloadOptions) (*KiroBuildResult, error) {
+	claudeBody = claude.NormalizeSonnet55Request(claudeBody, modelID)
 	requestCtx := KiroRequestContext{
 		ToolNameMap:                      map[string]string{},
 		ContextWindowTokens:              contextWindowTokensForModel(modelID),
@@ -716,6 +723,9 @@ func BuildKiroPayloadWithOptions(claudeBody []byte, modelID, profileArn string, 
 		origin = "AI_EDITOR"
 	}
 	outputCap := kiroMaxOutputTokensForModel(firstNonEmptyString(gjson.GetBytes(claudeBody, "model").String(), modelID))
+	if claude.IsSonnet55Model(modelID) {
+		outputCap = 128000
+	}
 	var maxTokens int64
 	if mt := gjson.GetBytes(claudeBody, "max_tokens"); mt.Exists() {
 		maxTokens = mt.Int()
@@ -746,7 +756,7 @@ func BuildKiroPayloadWithOptions(claudeBody []byte, modelID, profileArn string, 
 
 	messages := gjson.GetBytes(claudeBody, "messages")
 	normalizedMessages := normalizeInlineSystemMessages(messages)
-	thinking := deriveThinkingDirective(claudeBody, headers)
+	thinking := deriveThinkingDirective(claudeBody, headers, modelID)
 	if hasForcedClaudeToolChoice(claudeBody) {
 		thinking = nil
 	}
@@ -2489,11 +2499,32 @@ func inlineSystemContentIsEmpty(content gjson.Result) bool {
 	return false
 }
 
-func deriveThinkingDirective(body []byte, headers http.Header) *thinkingDirective {
+func deriveThinkingDirective(body []byte, headers http.Header, mappedModel ...string) *thinkingDirective {
+	effectiveModel := firstNonEmptyString(mappedModel...)
+	if effectiveModel == "" {
+		effectiveModel = gjson.GetBytes(body, "model").String()
+	}
+	if claude.IsSonnet55Model(effectiveModel) && !gjson.GetBytes(body, "thinking.type").Exists() {
+		effort := strings.TrimSpace(gjson.GetBytes(body, "output_config.effort").String())
+		if effort == "" {
+			effort = "high"
+		}
+		return &thinkingDirective{Mode: "adaptive", BudgetTokens: 20000, Effort: effort}
+	}
 	if override := thinkingDirectiveFromModel(gjson.GetBytes(body, "model").String()); override != nil {
+		if claude.IsSonnet55Model(effectiveModel) {
+			if effort := gjson.GetBytes(body, "output_config.effort").String(); effort != "" {
+				override.Effort = effort
+			}
+		}
 		return override
 	}
 	switch thinkingType := strings.ToLower(strings.TrimSpace(gjson.GetBytes(body, "thinking.type").String())); thinkingType {
+	case "between_tools":
+		if !claude.IsSonnet55Model(effectiveModel) {
+			return nil
+		}
+		return &thinkingDirective{Mode: "between_tools", Effort: firstNonEmptyString(gjson.GetBytes(body, "output_config.effort").String(), "high")}
 	case "adaptive":
 		effort := strings.TrimSpace(gjson.GetBytes(body, "output_config.effort").String())
 		if effort == "" {
@@ -2544,7 +2575,8 @@ func thinkingDirectiveFromModel(model string) *thinkingDirective {
 		"claude-opus-4-8", "claude-opus-4.8",
 		"claude-opus-5",
 		// Opus 5.5 只接受 thinking.type=adaptive（Kiro 模型元数据的 enum 仅此一项）。
-		"claude-opus-5-5", "claude-opus-5.5":
+		"claude-opus-5-5", "claude-opus-5.5",
+		"claude-sonnet-5-5", "claude-sonnet-5.5":
 		return &thinkingDirective{
 			Mode:         "adaptive",
 			BudgetTokens: 24576,
@@ -2598,7 +2630,7 @@ func buildOperatorInjectedSystemPrompt(modelID, systemPrompt string, thinking *t
 	if instructions := strings.TrimSpace(operatorInstructions); instructions != "" {
 		promptParts = append(promptParts, instructions)
 	}
-	nativeClaudeCodeAdaptive := preserveNativeClaudeCodeSystem && (thinking == nil || thinking.Mode == "adaptive")
+	nativeClaudeCodeAdaptive := preserveNativeClaudeCodeSystem && (thinking == nil || thinking.Mode == "adaptive" || thinking.Mode == "between_tools")
 	if !nativeClaudeCodeAdaptive {
 		if temporalContext := buildKiroTemporalContext(); temporalContext != "" {
 			promptParts = append(promptParts, temporalContext)
@@ -2663,7 +2695,7 @@ func kiroIdentityPromptForModel(modelID string) string {
 // buildLegacyInjectedSystemPrompt is the pre-2026-09 assembly, retained for GPT
 // and Sonnet-family models.
 func buildLegacyInjectedSystemPrompt(modelID, systemPrompt string, thinking *thinkingDirective, toolChoiceHint string, preserveNativeClaudeCodeSystem bool, hasChunkedTools bool) string {
-	if preserveNativeClaudeCodeSystem && !IsKiroGPTModel(modelID) && (thinking == nil || thinking.Mode == "adaptive") {
+	if preserveNativeClaudeCodeSystem && !IsKiroGPTModel(modelID) && (thinking == nil || thinking.Mode == "adaptive" || thinking.Mode == "between_tools") {
 		promptParts := []string{renderKiroBuiltinIdentityPrompt("Claude Code"), systemPrompt, systemIdentityConfidentialityPolicy}
 		systemPrompt = strings.Join(promptParts, "\n\n")
 		if toolChoiceHint != "" {
@@ -2706,6 +2738,8 @@ func prependThinkingDirective(systemPrompt string, thinking *thinkingDirective) 
 		return systemPrompt
 	}
 	switch thinking.Mode {
+	case "between_tools":
+		return systemPrompt
 	case "adaptive":
 		effort := strings.TrimSpace(thinking.Effort)
 		if effort == "" {
@@ -2774,6 +2808,9 @@ func buildAdditionalModelRequestFields(thinking *thinkingDirective, modelID stri
 	// 判断是否是 output_config 路径的模型（Claude 4.6+）
 	if !isOutputConfigPathModel(modelID) {
 		return nil
+	}
+	if thinking.Mode == "between_tools" {
+		return map[string]any{"thinking": map[string]any{"type": "between_tools"}, "output_config": map[string]any{"effort": thinking.Effort}}
 	}
 	if thinking.Mode == "adaptive" {
 		effort := strings.TrimSpace(thinking.Effort)

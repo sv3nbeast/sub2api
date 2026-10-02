@@ -2474,6 +2474,7 @@ func applyAnthropicThinkingAliasToRequest(req *apicompat.AnthropicRequest, reque
 	normalizeAnthropicOpus5ThinkingRequest(req, req.Model)
 	normalizeAnthropicFable51Request(req)
 	normalizeAnthropicAdaptiveOnlyThinkingRequest(req)
+	normalizeAnthropicSonnet55Request(req)
 }
 
 func (s *GatewayService) buildOAuthMetadataUserID(parsed *ParsedRequest, account *Account, fp *Fingerprint) string {
@@ -7449,6 +7450,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		}
 		passthroughBody = ensureAnthropicThinkingForModelAlias(passthroughBody, originalModel)
 		passthroughBody = normalizeAnthropicOpus5Thinking(passthroughBody, passthroughModel)
+		passthroughBody = claude.NormalizeSonnet55Request(passthroughBody, passthroughModel)
 		passthroughBody = normalizeAnthropicFable51RequestBody(passthroughBody, passthroughModel)
 		passthroughBody = sanitizeAnthropicUpstreamRequestBody(passthroughBody)
 		passthroughBody = PrepareSharedAnthropicThinkingHistory(passthroughBody, account, passthroughModel)
@@ -7652,6 +7654,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	}
 	body = ensureAnthropicThinkingForModelAlias(body, originalModel)
 	body = normalizeAnthropicOpus5Thinking(body, reqModel)
+	body = claude.NormalizeSonnet55Request(body, reqModel)
 	body = normalizeAnthropicFable51RequestBody(body, reqModel)
 	body = sanitizeAnthropicUpstreamRequestBody(body)
 	if err := replaceBody(PrepareSharedAnthropicThinkingHistory(body, account, reqModel)); err != nil {
@@ -13635,6 +13638,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 		}
 		passthroughBody = ensureAnthropicThinkingForModelAlias(passthroughBody, originalModel)
 		passthroughBody = normalizeAnthropicOpus5Thinking(passthroughBody, passthroughModel)
+		passthroughBody = claude.NormalizeSonnet55Request(passthroughBody, passthroughModel)
 		passthroughBody = sanitizeAnthropicCountTokensRequestBody(passthroughBody)
 		passthroughBody = PrepareSharedAnthropicThinkingHistory(passthroughBody, account, passthroughModel)
 		return s.forwardCountTokensAnthropicAPIKeyPassthrough(ctx, c, account, passthroughBody)
@@ -13725,6 +13729,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 	}
 	body = ensureAnthropicThinkingForModelAlias(body, originalModel)
 	body = normalizeAnthropicOpus5Thinking(body, reqModel)
+	body = claude.NormalizeSonnet55Request(body, reqModel)
 	body = sanitizeAnthropicCountTokensRequestBody(body)
 	if err := replaceBody(PrepareSharedAnthropicThinkingHistory(body, account, reqModel)); err != nil {
 		return err

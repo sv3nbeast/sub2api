@@ -1560,6 +1560,8 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
   })
   const claudeModels = {
     'claude-fable-5': claudeModel('Claude Fable 5', 1048576, 128000, { type: 'adaptive' }),
+    'claude-sonnet-5-5': claudeModel('Claude Sonnet 5.5', 1000000, 128000, { type: 'adaptive' }),
+    'claude-sonnet-5-5-thinking': claudeModel('Claude Sonnet 5.5 (Thinking)', 1000000, 128000, { type: 'adaptive' }),
     'claude-sonnet-5': claudeModel('Claude Sonnet 5', 1000000, 128000),
     'claude-opus-5-5': claudeModel('Claude Opus 5.5', 1000000, 128000, { type: 'adaptive' }),
     'claude-opus-5-5-thinking': claudeModel('Claude Opus 5.5 (Thinking)', 1000000, 128000, { type: 'adaptive' }),
@@ -1598,7 +1600,9 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
   } else if (platform === 'antigravity-claude') {
     provider[platform].npm = '@ai-sdk/anthropic'
     provider[platform].name = 'Antigravity (Claude)'
-    provider[platform].models = anthropicClaudeModels
+    provider[platform].models = Object.fromEntries(
+      Object.entries(anthropicClaudeModels).filter(([model]) => !model.startsWith('claude-sonnet-5-5'))
+    )
   } else if (platform === 'antigravity-gemini') {
     provider[platform].npm = '@ai-sdk/google'
     provider[platform].name = 'Antigravity (Gemini)'

@@ -25,6 +25,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/anthropictokenizer"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/google/uuid"
 	pdf "github.com/ledongthuc/pdf"
 	"github.com/tidwall/gjson"
@@ -337,7 +338,7 @@ type KiroAdditionalModelRequestFields struct {
 
 type KiroAdaptiveThinking struct {
 	Type    string `json:"type"`
-	Display string `json:"display"`
+	Display string `json:"display,omitempty"`
 }
 
 type KiroOutputConfig struct {
@@ -548,6 +549,7 @@ func contextWindowTokensForModel(model string) int {
 	switch normalizeModelAlias(normalized) {
 	case "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
 		"claude-opus-5", "claude-opus-5-5", "claude-opus-5.5",
+		"claude-sonnet-5-5", "claude-sonnet-5.5",
 		"claude-sonnet-5", "claude-sonnet-5.0",
 		"claude-sonnet-4-6", "claude-sonnet-4.6",
 		"claude-opus-4-6", "claude-opus-4.6",
@@ -579,6 +581,7 @@ func isRejectedKiroModelVariant(model string) bool {
 func requiresImplicitThinkingTagStripping(modelID string) bool {
 	switch strings.TrimSpace(strings.ToLower(modelID)) {
 	case "claude-opus-5", "claude-opus-5-thinking",
+		"claude-sonnet-5.5", "claude-sonnet-5-5", "claude-sonnet-5-5-thinking", "claude-sonnet-5.5-thinking",
 		"claude-opus-5.5", "claude-opus-5-5", "claude-opus-5-5-thinking",
 		"claude-opus-4.7", "claude-opus-4-7", "claude-opus-4-7-thinking",
 		"claude-opus-4.8", "claude-opus-4-8", "claude-opus-4-8-thinking":
@@ -700,7 +703,8 @@ func normalizeKiroEnvPlatform(platform string) string {
 func kiroMaxOutputTokensForModel(model string) int {
 	normalized := normalizeModelAlias(model)
 	switch normalized {
-	case "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "claude-opus-5", "claude-opus-5-5", "claude-opus-5.5", "claude-opus-4-8", "claude-opus-4.8", "claude-opus-4-7", "claude-opus-4.7", "claude-opus-4-6", "claude-opus-4.6":
+	case "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "claude-sonnet-5-5", "claude-sonnet-5.5",
+		"claude-opus-5", "claude-opus-5-5", "claude-opus-5.5", "claude-opus-4-8", "claude-opus-4.8", "claude-opus-4-7", "claude-opus-4.7", "claude-opus-4-6", "claude-opus-4.6":
 		return 128000
 	case "claude-sonnet-4-6", "claude-sonnet-4.6":
 		return 64000
@@ -729,6 +733,7 @@ func BuildKiroPayloadWithContext(claudeBody []byte, modelID, profileArn, origin 
 }
 
 func BuildKiroPayloadWithOptions(claudeBody []byte, modelID, profileArn string, headers http.Header, options KiroPayloadOptions) (*KiroBuildResult, error) {
+	claudeBody = claude.NormalizeSonnet55Request(claudeBody, modelID)
 	contextWindowTokens := contextWindowTokensForModel(modelID)
 	requestCtx := KiroRequestContext{
 		ToolNameMap:         map[string]string{},
@@ -740,6 +745,9 @@ func BuildKiroPayloadWithOptions(claudeBody []byte, modelID, profileArn string, 
 		origin = "AI_EDITOR"
 	}
 	outputCap := kiroMaxOutputTokensForModel(firstNonEmptyString(gjson.GetBytes(claudeBody, "model").String(), modelID))
+	if claude.IsSonnet55Model(modelID) {
+		outputCap = 128000
+	}
 	var maxTokens int64
 	if mt := gjson.GetBytes(claudeBody, "max_tokens"); mt.Exists() {
 		maxTokens = mt.Int()
@@ -770,7 +778,7 @@ func BuildKiroPayloadWithOptions(claudeBody []byte, modelID, profileArn string, 
 
 	messages := gjson.GetBytes(claudeBody, "messages")
 	normalizedMessages := normalizeInlineSystemMessages(messages)
-	thinking := deriveThinkingDirective(claudeBody, headers)
+	thinking := deriveThinkingDirective(claudeBody, headers, modelID)
 	if hasForcedClaudeToolChoice(claudeBody) {
 		thinking = nil
 	}
@@ -901,6 +909,10 @@ func BuildKiroPayloadWithOptions(claudeBody []byte, modelID, profileArn string, 
 	}
 
 	conversationID := buildKiroConversationID(modelID, systemPrompt, firstKiroConversationAnchor(normalizedMessages))
+
+	if thinking != nil && thinking.Mode == "between_tools" {
+		additionalModelRequestFields = &KiroAdditionalModelRequestFields{Thinking: &KiroAdaptiveThinking{Type: "between_tools"}, OutputConfig: &KiroOutputConfig{Effort: thinking.Effort}}
+	}
 
 	payload := KiroPayload{
 		ConversationState: KiroConversationState{
@@ -2216,8 +2228,24 @@ func inlineSystemContentIsEmpty(content gjson.Result) bool {
 	return false
 }
 
-func deriveThinkingDirective(body []byte, headers http.Header) *thinkingDirective {
+func deriveThinkingDirective(body []byte, headers http.Header, mappedModel ...string) *thinkingDirective {
+	effectiveModel := firstNonEmptyString(mappedModel...)
+	if effectiveModel == "" {
+		effectiveModel = gjson.GetBytes(body, "model").String()
+	}
+	if claude.IsSonnet55Model(effectiveModel) && !gjson.GetBytes(body, "thinking.type").Exists() {
+		effort := strings.TrimSpace(gjson.GetBytes(body, "output_config.effort").String())
+		if effort == "" {
+			effort = "high"
+		}
+		return &thinkingDirective{Mode: "adaptive", BudgetTokens: 20000, Effort: effort}
+	}
 	if override := thinkingDirectiveFromModel(gjson.GetBytes(body, "model").String()); override != nil {
+		if claude.IsSonnet55Model(effectiveModel) {
+			if effort := gjson.GetBytes(body, "output_config.effort").String(); effort != "" {
+				override.Effort = effort
+			}
+		}
 		return override
 	}
 	model := strings.ToLower(strings.TrimSpace(gjson.GetBytes(body, "model").String()))
@@ -2240,6 +2268,11 @@ func deriveThinkingDirective(body []byte, headers http.Header) *thinkingDirectiv
 		thinkingType = "adaptive"
 	}
 	switch thinkingType {
+	case "between_tools":
+		if !claude.IsSonnet55Model(effectiveModel) {
+			return nil
+		}
+		return &thinkingDirective{Mode: "between_tools", Effort: firstNonEmptyString(gjson.GetBytes(body, "output_config.effort").String(), "high")}
 	case "adaptive":
 		effort := firstNonEmptyString(
 			gjson.GetBytes(body, "output_config.effort").String(),
@@ -2300,7 +2333,8 @@ func thinkingDirectiveFromModel(model string) *thinkingDirective {
 		}
 	// opus 4.7+ 走 adaptive 高预算,budget 对齐 Antigravity 的 ClaudeAdaptiveHighThinkingBudgetTokens
 	// 避免 thinking 提前耗尽导致流式中途断开
-	case "claude-opus-5", "claude-opus-5-5", "claude-opus-5.5",
+	case "claude-sonnet-5-5", "claude-sonnet-5.5",
+		"claude-opus-5", "claude-opus-5-5", "claude-opus-5.5",
 		"claude-opus-4-7", "claude-opus-4.7",
 		"claude-opus-4-8", "claude-opus-4.8":
 		return &thinkingDirective{
@@ -2357,6 +2391,8 @@ func buildInjectedSystemPrompt(systemPrompt string, thinking *thinkingDirective,
 	}
 	if thinking != nil {
 		switch thinking.Mode {
+		case "between_tools":
+			// No up-front thinking prompt; native fields carry this mode.
 		case "adaptive":
 			effort := strings.TrimSpace(thinking.Effort)
 			if effort == "" {

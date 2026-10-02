@@ -23,12 +23,27 @@ interface ApiErrorLike {
 
 /**
  * Extract the error code from an API error object.
+ *
+ * Prefers the semantic identifiers (`reason`, or a string `code`) over the
+ * numeric HTTP status the interceptor copies into `code`. Domain failures are
+ * enveloped as `{ code: 400, message, reason: "INVALID_AMOUNT" }`, so reading
+ * `code` first yields "400" and every i18n lookup keyed on the reason misses.
+ * Numeric codes are still returned as a last resort so callers that switch on
+ * an HTTP status keep working.
  */
 export function extractApiErrorCode(err: unknown): string | undefined {
   if (!err || typeof err !== 'object') return undefined
   const e = err as ApiErrorLike
-  const code = e.code ?? e.reason ?? e.response?.data?.code
-  return code != null ? String(code) : undefined
+  const candidates = [e.reason, e.code, e.response?.data?.code]
+  for (const candidate of candidates) {
+    // Skip numeric HTTP statuses while a semantic identifier may still follow.
+    if (typeof candidate === 'number') continue
+    if (typeof candidate === 'string' && candidate.trim() !== '') return candidate
+  }
+  const numeric = candidates.find(
+    (candidate) => typeof candidate === 'number' || (typeof candidate === 'string' && candidate.trim() !== ''),
+  )
+  return numeric != null ? String(numeric) : undefined
 }
 
 /**

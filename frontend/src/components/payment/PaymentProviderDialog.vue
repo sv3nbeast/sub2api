@@ -346,7 +346,16 @@ function providerSupportsPaymentMode(providerKey: string): boolean {
  * from a different provider (or stale data) back to the default. */
 function isValidPaymentMode(providerKey: string, mode: string): boolean {
   if (providerKey === 'easypay') {
-    return mode === PAYMENT_MODE_QRCODE || mode === PAYMENT_MODE_POPUP
+    // EasyPay-compatible gateways split into two shapes and need both modes:
+    //   qrcode   — the upstream hands back a payable string (wallet address /
+    //              payment URI) that the cashier renders as a QR code.
+    //   redirect — the upstream is a hosted checkout that only returns a page
+    //              URL, so the client must open it instead of scanning it.
+    // GMPay Edge is the second shape: its mapi.php answer carries a checkout
+    // URL and no scannable payload, so qrcode mode would embed a URL in a QR.
+    return mode === PAYMENT_MODE_QRCODE
+      || mode === PAYMENT_MODE_POPUP
+      || mode === PAYMENT_MODE_REDIRECT
   }
   if (providerKey === 'alipay') {
     return mode === '' || mode === PAYMENT_MODE_REDIRECT
@@ -444,6 +453,7 @@ const paymentModeOptions = computed(() => {
   }
   return [
     { value: PAYMENT_MODE_QRCODE, label: t('admin.settings.payment.modeQRCode') },
+    { value: PAYMENT_MODE_REDIRECT, label: t('admin.settings.payment.modeRedirect') },
     { value: PAYMENT_MODE_POPUP, label: t('admin.settings.payment.modePopup') },
   ]
 })

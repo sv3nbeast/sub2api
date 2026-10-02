@@ -308,6 +308,7 @@ export default {
       link: 'Link',
       alipay_direct: 'Alipay (Direct)',
       wxpay_direct: 'WeChat Pay (Direct)',
+      usdt_bep20: 'USDT (BEP20)',
     },
     status: {
       pending: 'Pending',

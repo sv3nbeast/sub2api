@@ -44,11 +44,23 @@ export const PROVIDER_SUPPORTED_TYPES: Record<string, string[]> = {
   airwallex: ['airwallex'],
 }
 
-/** Available payment modes for EasyPay providers. */
-export const EASYPAY_PAYMENT_MODES = ['qrcode', 'popup'] as const
+/** Available payment modes for EasyPay providers.
+ *
+ * Includes `redirect` because not every EasyPay-compatible upstream is a
+ * scannable-payload gateway: hosted checkouts (e.g. GMPay Edge) answer with a
+ * page URL and must be opened rather than rendered as a QR code. */
+export const EASYPAY_PAYMENT_MODES = ['qrcode', 'redirect', 'popup'] as const
 
-/** Fixed display order for user-facing payment methods */
-export const METHOD_ORDER = ['alipay', 'alipay_direct', 'wxpay', 'wxpay_direct', 'stripe', 'airwallex'] as const
+/**
+ * Fixed display order for user-facing payment methods.
+ *
+ * Order doubles as the default selection: PaymentView picks `sorted[0]`, so the
+ * first entry wins whenever it is offered. `usdt_bep20` (GMPay Edge, USDT on
+ * BNB Smart Chain) therefore leads on purpose — the crypto method is the
+ * intended default, with Alipay staying selectable behind it. Methods absent
+ * from this list sort last and never displace a listed entry.
+ */
+export const METHOD_ORDER = ['usdt_bep20', 'alipay', 'alipay_direct', 'wxpay', 'wxpay_direct', 'stripe', 'airwallex'] as const
 
 export function isBuiltInAlipayMethod(type: string): boolean {
   return type === 'alipay' || type === 'alipay_direct'

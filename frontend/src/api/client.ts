@@ -254,11 +254,20 @@ apiClient.interceptors.response.use(
         }
       }
 
-      // Return structured error
+      // Return structured error.
+      //
+      // `reason` and `metadata` must survive this rewrap: the backend envelops
+      // domain failures as `{ code: <http status>, message, reason, metadata }`,
+      // so dropping them here discards the only machine-readable error identity
+      // and the parameters its localized copy interpolates. Every i18n lookup
+      // keyed on reason (payment.errors.*, EMAIL_DOMAIN_REGISTRATION_LIMIT, …)
+      // silently falls back to the raw English message without them.
       return Promise.reject({
         status,
         code: apiData.code,
         error: apiData.error,
+        reason: apiData.reason,
+        metadata: apiData.metadata,
         message: apiData.message || apiData.detail || error.message
       })
     }

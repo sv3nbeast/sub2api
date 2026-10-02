@@ -332,6 +332,7 @@ export default {
       link: 'Link',
       alipay_direct: '支付宝（直连）',
       wxpay_direct: '微信支付（直连）',
+      usdt_bep20: 'USDT（BEP20）',
     },
     status: {
       pending: '待支付',

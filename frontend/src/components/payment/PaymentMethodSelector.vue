@@ -76,6 +76,9 @@ const METHOD_ICONS: Record<string, string> = {
   stripe: stripeIcon,
   airwallex: airwallexIcon,
   credit_card: paymentIcon,
+  // No dedicated USDT/BEP20 brand asset ships with the repo yet; the generic
+  // payment mark is the intended stand-in rather than an accidental fallback.
+  usdt_bep20: paymentIcon,
 }
 
 const sortedMethods = computed(() => {

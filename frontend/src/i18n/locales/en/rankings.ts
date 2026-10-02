@@ -10,7 +10,7 @@ export default {
     periods: { today: 'Today', week: 'Last 7 days', month: 'Last 30 days', year: 'Last year' },
     periodHint: 'Aggregated in {timezone}. Rank changes compare with the preceding equal-length period.',
     tokenDefinition: 'How we count',
-    tokenHint: 'Total tokens = input + output + cache reads + cache writes. Only recorded usage of public channels is aggregated, including cache tokens. Available history depends on log retention. Rankings do not measure model quality or industry-wide market share.',
+    tokenHint: 'Total tokens = input + output + cache reads + cache writes. Claude -thinking variants are combined with their base models. Only recorded usage of public channels is aggregated, including cache tokens. Available history depends on log retention. Rankings do not measure model quality or industry-wide market share.',
     totalTokens: 'Total tokens',
     totalRequests: 'Total requests',
     activeModels: 'Active models',

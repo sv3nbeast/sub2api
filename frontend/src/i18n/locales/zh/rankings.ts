@@ -10,7 +10,7 @@ export default {
     periods: { today: '今日', week: '近 7 天', month: '近 30 天', year: '近一年' },
     periodHint: '按 {timezone} 统计，排名变化与前一个等长时段对比。',
     tokenDefinition: '统计口径',
-    tokenHint: '总 Token = 输入 + 输出 + 缓存读取 + 缓存写入。仅聚合本站公开渠道的用量记录，缓存用量也计入；可用历史受记录保留期影响，不代表模型能力或全行业份额。',
+    tokenHint: '总 Token = 输入 + 输出 + 缓存读取 + 缓存写入。Claude 的 -thinking 变体合并到对应基础模型。仅聚合本站公开渠道的用量记录，缓存用量也计入；可用历史受记录保留期影响，不代表模型能力或全行业份额。',
     totalTokens: '总 Token 用量',
     totalRequests: '总请求数',
     activeModels: '活跃模型',

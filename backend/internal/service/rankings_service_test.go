@@ -183,6 +183,103 @@ func TestBuildRankingsSnapshot_MultiCreatorAliasKeepsVendorBuckets(t *testing.T)
 	require.Equal(t, snapshot.TotalTokens, modelTotal)
 }
 
+func TestBuildRankingsSnapshot_ClaudeThinkingMergesBothPeriodsWithoutMutatingUsage(t *testing.T) {
+	now := time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
+	window, err := RankingsPeriodRange("week", now, time.UTC)
+	require.NoError(t, err)
+	day := rankingsBucketStart(now, "day")
+	buckets := []RankingsBucket{
+		{Bucket: day, Model: "claude-opus-5-5", CreatorModel: "claude-opus-5-5", InputTokens: 100, OutputTokens: 20, CacheReadTokens: 200, CacheCreationTokens: 80, Requests: 2},
+		{Bucket: day.AddDate(0, 0, -1), Model: "claude-opus-5-5-thinking", CreatorModel: "claude-opus-5-5-thinking", InputTokens: 150, OutputTokens: 30, CacheReadTokens: 300, CacheCreationTokens: 120, Requests: 3},
+		{Bucket: day, Model: "gpt-5.6", CreatorModel: "gpt-5.6", InputTokens: 750, Requests: 2},
+		{Bucket: window.ComparisonStart, Previous: true, Model: "claude-opus-5-5", CreatorModel: "claude-opus-5-5", InputTokens: 60, OutputTokens: 10, CacheReadTokens: 20, CacheCreationTokens: 10, Requests: 1},
+		{Bucket: window.ComparisonStart, Previous: true, Model: "claude-opus-5-5-thinking", CreatorModel: "claude-opus-5-5-thinking", InputTokens: 240, OutputTokens: 40, CacheReadTokens: 80, CacheCreationTokens: 40, Requests: 4},
+		{Bucket: window.ComparisonStart, Previous: true, Model: "gpt-5.6", CreatorModel: "gpt-5.6", InputTokens: 600, Requests: 2},
+	}
+	original := append([]RankingsBucket(nil), buckets...)
+	snapshot := BuildRankingsSnapshot("week", now, window, buckets)
+	require.Equal(t, original, buckets, "ranking normalization must not change source usage or billing fields")
+	require.Equal(t, 2, snapshot.ModelsCount)
+	require.Len(t, snapshot.Models, 2)
+	require.Equal(t, int64(1750), snapshot.TotalTokens)
+	require.Equal(t, int64(7), snapshot.TotalRequests)
+	merged := snapshot.Models[0]
+	require.Equal(t, "claude-opus-5-5", merged.ModelName)
+	require.Equal(t, int64(250), merged.InputTokens)
+	require.Equal(t, int64(50), merged.OutputTokens)
+	require.Equal(t, int64(500), merged.CacheReadTokens)
+	require.Equal(t, int64(200), merged.CacheCreationTokens)
+	require.Equal(t, int64(1000), merged.TotalTokens)
+	require.Equal(t, int64(5), merged.Requests)
+	require.InDelta(t, 100, *merged.GrowthPct, 1e-10, "growth compares the merged current 1000 with merged previous 500")
+	require.Equal(t, 2, *merged.PreviousRank)
+	require.Equal(t, 1, *merged.RankDelta)
+	require.Len(t, snapshot.TopMovers, 1)
+	require.Equal(t, "claude-opus-5-5", snapshot.TopMovers[0].ModelName)
+	require.Len(t, snapshot.Vendors, 2)
+	claudeVendor := snapshot.Vendors[0]
+	require.Equal(t, "anthropic", claudeVendor.VendorID)
+	require.Equal(t, int64(1000), claudeVendor.TotalTokens)
+	require.Equal(t, int64(5), claudeVendor.Requests)
+	require.Equal(t, 1, claudeVendor.ModelsCount)
+	require.Equal(t, "claude-opus-5-5", claudeVendor.TopModel)
+	require.InDelta(t, 100, *claudeVendor.GrowthPct, 1e-10)
+	var modelHistoryTotal, vendorHistoryTotal, mergedHistoryTotal int64
+	for _, point := range snapshot.ModelsHistory.Points {
+		require.NotContains(t, point.Model, "-thinking")
+		modelHistoryTotal += point.Tokens
+		if point.Model == "claude-opus-5-5" {
+			mergedHistoryTotal += point.Tokens
+		}
+	}
+	for _, point := range snapshot.VendorShareHistory.Points {
+		vendorHistoryTotal += point.Tokens
+	}
+	require.Equal(t, int64(1000), mergedHistoryTotal)
+	require.Equal(t, snapshot.TotalTokens, modelHistoryTotal)
+	require.Equal(t, snapshot.TotalTokens, vendorHistoryTotal)
+}
+
+func TestBuildRankingsSnapshot_ThinkingNormalizationSupportsFutureClaudeOnly(t *testing.T) {
+	now := time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
+	window, err := RankingsPeriodRange("today", now, time.UTC)
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		name  string
+		merge bool
+	}{
+		{name: "claude-opus-8-2", merge: true},
+		{name: "claude-sonnet-4-20250514", merge: true},
+		{name: "claude-haiku-9", merge: true},
+		{name: "gpt-5.6", merge: false},
+		{name: "custom-thing", merge: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			buckets := []RankingsBucket{
+				{Bucket: window.Start, Model: tc.name, InputTokens: 10, Requests: 1},
+				{Bucket: window.Start, Model: tc.name + "-thinking", InputTokens: 20, Requests: 2},
+			}
+			snapshot := BuildRankingsSnapshot("today", now, window, buckets)
+			require.Equal(t, int64(30), snapshot.TotalTokens)
+			require.Equal(t, int64(3), snapshot.TotalRequests)
+			if tc.merge {
+				require.Equal(t, 1, snapshot.ModelsCount)
+				require.Len(t, snapshot.Models, 1)
+				require.Equal(t, tc.name, snapshot.Models[0].ModelName)
+				require.Equal(t, int64(30), snapshot.Models[0].InputTokens)
+				require.Equal(t, int64(3), snapshot.Models[0].Requests)
+				require.Equal(t, 1, snapshot.Vendors[0].ModelsCount)
+			} else {
+				require.Equal(t, 2, snapshot.ModelsCount)
+				require.Len(t, snapshot.Models, 2)
+				require.Equal(t, tc.name+"-thinking", snapshot.Models[0].ModelName)
+				require.Equal(t, tc.name, snapshot.Models[1].ModelName)
+				require.Equal(t, 2, snapshot.Vendors[0].ModelsCount)
+			}
+		})
+	}
+}
+
 func TestBuildRankingsSnapshot_FallBackHoursRemainDistinct(t *testing.T) {
 	loc, err := time.LoadLocation("America/New_York")
 	require.NoError(t, err)

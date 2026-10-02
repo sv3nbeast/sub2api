@@ -263,6 +263,15 @@ func RankingsModelVendor(model string) (id, name string) {
 // BuildRankingsSnapshot converts anonymous aggregate buckets into a snapshot.
 // It is also usable by exports without HTTP or gateway dependencies.
 func BuildRankingsSnapshot(period string, now time.Time, window RankingsRange, buckets []RankingsBucket) *RankingsSnapshot {
+	// Normalize before all aggregations, including the previous period and
+	// histories. Work on a copy so exports and shared repository data keep
+	// their original request model names.
+	normalized := make([]RankingsBucket, len(buckets))
+	for i, bucket := range buckets {
+		bucket.Model = rankingsModelName(bucket.Model)
+		normalized[i] = bucket
+	}
+	buckets = normalized
 	snapshot := &RankingsSnapshot{Period: period, GeneratedAt: now, StartAt: window.Start, EndAt: window.End,
 		Timezone: window.Timezone, ComparisonStartAt: window.ComparisonStart, ComparisonEndAt: window.ComparisonEnd,
 		Models: []RankingsModel{}, Vendors: []RankingsVendor{}, TopMovers: []RankingsModel{}, TopDroppers: []RankingsModel{},
@@ -358,6 +367,20 @@ func BuildRankingsSnapshot(period string, now time.Time, window RankingsRange, b
 	}
 	snapshot.ModelsHistory, snapshot.VendorShareHistory = rankingsHistories(window, models, vendors, buckets)
 	return snapshot
+}
+
+// Claude thinking variants select a reasoning mode of the same base model.
+// Keep this display grouping local to rankings; other providers and custom
+// aliases retain their names rather than being replaced with upstream routes.
+func rankingsModelName(model string) string {
+	model = strings.TrimSpace(model)
+	const thinkingSuffix = "-thinking"
+	if strings.HasSuffix(strings.ToLower(model), thinkingSuffix) {
+		if vendorID, _ := RankingsModelVendor(model); vendorID == "anthropic" {
+			return model[:len(model)-len(thinkingSuffix)]
+		}
+	}
+	return model
 }
 
 func bucketTokens(b RankingsBucket) int64 {

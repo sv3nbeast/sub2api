@@ -317,9 +317,10 @@ func BuildRankingsSnapshot(period string, now time.Time, window RankingsRange, b
 			row = &RankingsModel{ModelName: b.Model, Vendor: vendor, VendorID: vendorID}
 			target[b.Model] = row
 		} else if row.VendorID != vendorID {
-			// A client alias can route to multiple creators. Its model row keeps
-			// the requested name, while vendor statistics retain each bucket's
-			// own creator rather than attributing everything to the first one.
+			// A final model can be served by multiple upstream creators. Keep the
+			// model row grouped by its final name while vendor statistics retain
+			// each bucket's own creator rather than attributing everything to the
+			// first one.
 			row.VendorID, row.Vendor = "mixed", "Mixed"
 		}
 		row.InputTokens += b.InputTokens

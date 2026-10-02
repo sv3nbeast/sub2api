@@ -37,8 +37,16 @@ SELECT
         THEN DATE_BIN('1 hour'::interval, ul.created_at, $1::timestamptz)
         ELSE DATE_TRUNC($6, ul.created_at AT TIME ZONE $5) AT TIME ZONE $5
     END AS bucket,
-    COALESCE(NULLIF(BTRIM(ul.requested_model), ''), ul.model) AS model_name,
-    COALESCE(NULLIF(BTRIM(ul.upstream_model), ''), ul.model) AS creator_model,
+    COALESCE(
+        NULLIF(BTRIM(ul.upstream_model), ''),
+        NULLIF(BTRIM(ul.model), ''),
+        NULLIF(BTRIM(ul.requested_model), '')
+    ) AS model_name,
+    COALESCE(
+        NULLIF(BTRIM(ul.upstream_model), ''),
+        NULLIF(BTRIM(ul.model), ''),
+        NULLIF(BTRIM(ul.requested_model), '')
+    ) AS creator_model,
     ul.created_at < $1 AS previous,
     SUM(GREATEST(ul.input_tokens, 0))::bigint AS input_tokens,
     SUM(GREATEST(ul.output_tokens, 0))::bigint AS output_tokens,
@@ -56,8 +64,8 @@ const RankingsArchiveAggregateSQL = `
 WITH source AS (
     SELECT
         ar.bucket_date::timestamp AT TIME ZONE $5 AS event_at,
-        ar.requested_model AS model_name,
-        ar.creator_model,
+        COALESCE(NULLIF(BTRIM(ar.creator_model), ''), NULLIF(BTRIM(ar.requested_model), '')) AS model_name,
+        COALESCE(NULLIF(BTRIM(ar.creator_model), ''), NULLIF(BTRIM(ar.requested_model), '')) AS creator_model,
         ar.bucket_date < $1::date AS previous,
         ar.input_tokens,
         ar.output_tokens,
@@ -71,8 +79,16 @@ WITH source AS (
     UNION ALL
     SELECT
         ul.created_at AS event_at,
-        COALESCE(NULLIF(BTRIM(ul.requested_model), ''), ul.model) AS model_name,
-        COALESCE(NULLIF(BTRIM(ul.upstream_model), ''), ul.model) AS creator_model,
+        COALESCE(
+            NULLIF(BTRIM(ul.upstream_model), ''),
+            NULLIF(BTRIM(ul.model), ''),
+            NULLIF(BTRIM(ul.requested_model), '')
+        ) AS model_name,
+        COALESCE(
+            NULLIF(BTRIM(ul.upstream_model), ''),
+            NULLIF(BTRIM(ul.model), ''),
+            NULLIF(BTRIM(ul.requested_model), '')
+        ) AS creator_model,
         ul.created_at < $1 AS previous,
         GREATEST(ul.input_tokens, 0),
         GREATEST(ul.output_tokens, 0),

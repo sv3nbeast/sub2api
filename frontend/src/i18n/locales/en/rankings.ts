@@ -10,7 +10,7 @@ export default {
     periods: { today: 'Today', week: 'Last 7 days', month: 'Last 30 days', quarter: 'Last 90 days', year: 'Last year' },
     periodHint: 'Aggregated in {timezone}. Rank changes compare with the preceding equal-length period.',
     tokenDefinition: 'How we count',
-    tokenHint: 'Total tokens = input + output + cache reads + cache writes. Claude -thinking variants are combined with their base models. All channel usage records are aggregated; model history is recorded from this rollout, and the last-year view will open after a full year has been recorded.',
+    tokenHint: 'Total tokens = input + output + cache reads + cache writes. Claude -thinking variants are combined with their base models. All channel usage records are included; model history is shown for the last 90 days.',
     totalTokens: 'Total tokens',
     totalRequests: 'Total requests',
     activeModels: 'Active models',

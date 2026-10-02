@@ -1,4 +1,4 @@
--- Long-lived anonymous model usage facts for the public rankings page.
+-- Long-lived anonymous model usage facts for the all-channel rankings page.
 -- The source usage_logs table is intentionally retained only for a short
 -- operational window. These rows are written by the existing scheduled
 -- dashboard job after a local day closes and never participate in billing.
@@ -19,7 +19,7 @@ CREATE INDEX IF NOT EXISTS idx_public_rankings_daily_rollups_bucket
     ON public_rankings_daily_rollups (bucket_date DESC);
 
 COMMENT ON TABLE public_rankings_daily_rollups IS
-    'Long-lived anonymous daily model usage facts for the public rankings page.';
+    'Long-lived anonymous daily model usage facts for all channels shown on the rankings page.';
 
 CREATE TABLE IF NOT EXISTS public_rankings_rollup_state (
     id SMALLINT PRIMARY KEY CHECK (id = 1),

@@ -29,9 +29,8 @@ func (r *rankingsRepository) RankingsArchiveCoverage(ctx context.Context) (time.
 }
 
 // RankingsAggregateSQL reads only two bounded, indexed time ranges. It does
-// not join users, accounts or keys: deleting them must not remove anonymous
-// historical usage. Group visibility is checked at query time rather than
-// inferred from an account's serving platform.
+// not join groups, users, accounts or keys: the leaderboard represents all
+// usage records and remains stable when related metadata is changed or deleted.
 const RankingsAggregateSQL = `
 SELECT
     CASE WHEN $6 = 'hour'
@@ -47,10 +46,6 @@ SELECT
     SUM(GREATEST(ul.cache_creation_tokens, 0))::bigint AS cache_creation_tokens,
     COUNT(*)::bigint AS requests
 FROM usage_logs ul
-JOIN groups g ON g.id = ul.group_id
-    AND g.is_exclusive = FALSE
-    AND g.deleted_at IS NULL
-    AND g.status = 'active'
 WHERE ul.created_at >= $3 AND ul.created_at < $2
     AND ((ul.created_at >= $1 AND ul.created_at < $2)
         OR (ul.created_at >= $3 AND ul.created_at < $4))
@@ -85,10 +80,6 @@ WITH source AS (
         GREATEST(ul.cache_creation_tokens, 0),
         1::bigint
     FROM usage_logs ul
-    JOIN groups g ON g.id = ul.group_id
-        AND g.is_exclusive = FALSE
-        AND g.deleted_at IS NULL
-        AND g.status = 'active'
     WHERE ul.created_at >= $7
       AND ((ul.created_at >= $1 AND ul.created_at < $2)
         OR (ul.created_at >= $3 AND ul.created_at < $4))

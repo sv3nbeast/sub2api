@@ -69,7 +69,7 @@ describe('public RankingsView', () => {
     expect(wrapper.text()).toContain('1.25M')
     expect(wrapper.text()).toContain('claude-opus-5')
     expect(wrapper.text()).toContain('无对比数据')
-    expect(wrapper.text()).toContain('公开渠道')
+    expect(wrapper.text()).toContain('本站各渠道')
     expect(wrapper.get('.rankings-definition').text()).toContain('缓存读取')
     expect(wrapper.findAll('.chart-stub').map((chart) => chart.attributes('data-kind'))).toEqual(['models', 'share', 'vendors'])
     expect(wrapper.get('.rankings-rank-change.is-new').attributes('aria-label')).toBe('新上榜')

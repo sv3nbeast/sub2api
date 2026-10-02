@@ -212,9 +212,10 @@ func (r *dashboardAggregationRepository) UpdateAggregationWatermark(ctx context.
 	return err
 }
 
-// ArchivePublicRankings snapshots closed local days before usage_logs retention
-// can remove them. It is called by the existing singleton dashboard scheduler;
-// no trigger or synchronous write-path work is added.
+// ArchivePublicRankings snapshots all channel usage from closed local days
+// before usage_logs retention can remove it. It is called by the existing
+// singleton dashboard scheduler; no trigger or synchronous write-path work is
+// added.
 func (r *dashboardAggregationRepository) ArchivePublicRankings(ctx context.Context, now time.Time) error {
 	if r == nil || r.sql == nil {
 		return nil
@@ -278,11 +279,7 @@ func (r *dashboardAggregationRepository) ArchivePublicRankings(ctx context.Conte
 			SUM(GREATEST(ul.cache_creation_tokens, 0)),
 			SUM(GREATEST(ul.cache_read_tokens, 0)),
 			COUNT(*), NOW()
-		FROM usage_logs ul
-		JOIN groups g ON g.id = ul.group_id
-			AND g.is_exclusive = FALSE
-			AND g.deleted_at IS NULL
-			AND g.status = 'active'
+        FROM usage_logs ul
 		WHERE ul.created_at >= $1 AND ul.created_at < $2
 		GROUP BY 1, 2, 3
 		ON CONFLICT (bucket_date, requested_model, creator_model)

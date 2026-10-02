@@ -41,7 +41,7 @@ type ClaudeCodeCompanionProbeInput struct {
 	Body         []byte
 	Token        string
 	TokenType    string
-	ProxyURL     string
+	proxyURL     string // Derived from Account, never inherited from a relay request.
 	TLSProfile   *tlsfingerprint.Profile
 	SessionID    string
 	Config       config.GatewayClaudeCodeMimicryConfig
@@ -91,6 +91,12 @@ func (s *ClaudeCodeCompanionProbeService) MaybeTrigger(ctx context.Context, inpu
 	if !input.Account.IsAnthropicOAuthOrSetupToken() {
 		return
 	}
+	proxyURL, err := validatedAccountProxyURL(input.Account)
+	if err != nil {
+		slog.Warn("claude_code_companion_probe_skipped", "account_id", input.Account.ID, "reason", "proxy_unavailable")
+		return
+	}
+	input.proxyURL = proxyURL
 
 	sessionID := strings.TrimSpace(input.SessionID)
 	if sessionID == "" {
@@ -162,7 +168,7 @@ func (s *ClaudeCodeCompanionProbeService) sendOne(ctx context.Context, input Cla
 	}
 
 	start := time.Now()
-	resp, err := s.httpUpstream.DoWithTLS(req, input.ProxyURL, input.Account.ID, input.Account.Concurrency, input.TLSProfile)
+	resp, err := s.httpUpstream.DoWithTLS(req, input.proxyURL, input.Account.ID, input.Account.Concurrency, input.TLSProfile)
 	durationMs := time.Since(start).Milliseconds()
 	if err != nil {
 		if resp != nil && resp.Body != nil {

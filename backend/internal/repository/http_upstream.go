@@ -404,9 +404,7 @@ func (s *httpUpstreamService) getClientEntryWithTLSNormalizedProxy(proxyKey stri
 	}
 
 	client := &http.Client{Transport: transport}
-	if s.shouldValidateResolvedIP() && parsedProxy == nil {
-		client.CheckRedirect = s.directRedirectChecker
-	}
+	client.CheckRedirect = s.fingerprintRedirectChecker(parsedProxy)
 
 	entry := &upstreamClientEntry{
 		client:   client,
@@ -467,6 +465,20 @@ func (s *httpUpstreamService) directRedirectChecker(req *http.Request, via []*ht
 		return errors.New("stopped after 10 redirects")
 	}
 	return s.validateRequestHost(req, nil)
+}
+
+// Fingerprint transports must not downgrade authenticated HTTPS traffic.
+// Proxied redirect targets must still be resolved by the proxy, not locally.
+func (s *httpUpstreamService) fingerprintRedirectChecker(proxyURL *url.URL) func(*http.Request, []*http.Request) error {
+	return func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		if len(via) > 0 && via[len(via)-1].URL.Scheme == "https" && req.URL.Scheme != "https" {
+			return errors.New("upstream HTTPS downgrade redirect is not allowed")
+		}
+		return s.validateRequestHost(req, proxyURL)
+	}
 }
 
 // acquireClient 获取或创建客户端，并标记为进行中请求
@@ -1263,6 +1275,14 @@ func buildUpstreamHTTP1TransportWithTLSFingerprint(settings poolSettings, proxyU
 	proxyProfile := cloneTLSFingerprintProfileWithALPN(profile, []string{"http/1.1"})
 	dialTLSContext := antigravityTLSFingerprintDialTLSContext(proxyProfile, proxyURL)
 	return &http.Transport{
+		// HTTPS is tunneled by DialTLSContext. Plain HTTP (when explicitly
+		// permitted for a custom endpoint) must use the configured proxy too.
+		Proxy: func(req *http.Request) (*url.URL, error) {
+			if req.URL.Scheme == "http" {
+				return proxyURL, nil
+			}
+			return nil, nil
+		},
 		DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return dialTLSContext(ctx, network, addr, nil)
 		},

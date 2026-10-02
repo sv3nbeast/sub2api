@@ -66,6 +66,7 @@ func TestClaudeCodeCompanionProbeService_SendsCapturedAuxAndTitleRequests(t *tes
 	upstream := &companionProbeRecordingUpstream{}
 	service := NewClaudeCodeCompanionProbeService(upstream)
 	profile := tlsfingerprint.BuiltInDefaultProfile()
+	proxyID := int64(9)
 
 	service.MaybeTrigger(context.Background(), ClaudeCodeCompanionProbeInput{
 		Account: &Account{
@@ -74,11 +75,12 @@ func TestClaudeCodeCompanionProbeService_SendsCapturedAuxAndTitleRequests(t *tes
 			Platform:    PlatformAnthropic,
 			Type:        AccountTypeOAuth,
 			Concurrency: 3,
+			ProxyID:     &proxyID,
+			Proxy:       &Proxy{ID: proxyID, Protocol: "http", Host: "proxy.local", Port: 8080},
 		},
 		Body:         []byte(`{"metadata":{"user_id":"user_abc#org=org_123#session_id=11111111-1111-4111-8111-111111111111"},"messages":[{"role":"user","content":"hello"}]}`),
 		Token:        "oauth-token",
 		TokenType:    "oauth",
-		ProxyURL:     "http://proxy.local:8080",
 		TLSProfile:   profile,
 		SessionID:    "11111111-1111-4111-8111-111111111111",
 		RequestModel: "awsclaude4.5",

@@ -131,7 +131,7 @@ func (s *GatewayService) ForwardAsChatCompletions(
 	// 11. Send request
 	tlsProfile := s.tlsFPProfileService.ResolveTLSProfile(account)
 	if shouldMimicClaudeCode && tokenType == "oauth" && !IsClaudeCodeCompanionProbeTriggered(ctx) {
-		s.triggerClaudeCodeCompanionProbe(ctx, account, anthropicBody, token, tokenType, proxyURL, tlsProfile, mappedModel)
+		s.triggerClaudeCodeCompanionProbe(ctx, account, anthropicBody, token, tokenType, tlsProfile, mappedModel)
 		ctx = WithClaudeCodeCompanionProbeTriggered(ctx)
 	}
 	resp, err := s.httpUpstream.DoWithTLS(upstreamReq, proxyURL, account.ID, account.Concurrency, tlsProfile)

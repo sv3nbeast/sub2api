@@ -727,6 +727,11 @@ func normalizeModelRegistryBaseURL(raw string) string {
 }
 
 func (s *AccountTestService) fetchUpstreamModelList(ctx context.Context, account *Account) ([]string, []byte, error) {
+	if account != nil {
+		if _, err := validatedAccountProxyURL(account); err != nil {
+			return nil, nil, newUpstreamModelSyncConfigError("Configured account proxy is unavailable", err)
+		}
+	}
 	if s == nil {
 		return nil, nil, newUpstreamModelSyncConfigError("Account test service is not configured", nil)
 	}

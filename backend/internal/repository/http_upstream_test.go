@@ -542,7 +542,15 @@ func (s *HTTPUpstreamSuite) TestGetTLSClientEntry_WithProxyDoesNotInstallResolvi
 
 	entry, err := svc.getClientEntryWithTLS("socks5://proxy.local:1080", 1, 1, profile, service.HTTPUpstreamProfileDefault, false, false)
 	require.NoError(s.T(), err)
-	require.Nil(s.T(), entry.client.CheckRedirect, "TLS fingerprint proxied clients must not locally resolve redirect targets")
+	require.NotNil(s.T(), entry.client.CheckRedirect)
+	originalValidate := validateResolvedIP
+	defer func() { validateResolvedIP = originalValidate }()
+	validateResolvedIP = func(host string) error {
+		return errors.New("must not locally resolve proxied host: " + host)
+	}
+	req, err := http.NewRequest(http.MethodGet, "https://api.anthropic.com/redirect", nil)
+	require.NoError(s.T(), err)
+	require.NoError(s.T(), entry.client.CheckRedirect(req, []*http.Request{req}))
 }
 
 // TestAccountConcurrencyFallbackToDefault 测试账户并发数为 0 时回退到默认配置

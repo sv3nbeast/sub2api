@@ -62,6 +62,9 @@ func (p *ClaudeTokenProvider) GetAccessToken(ctx context.Context, account *Accou
 	if account.HasAnthropicStableIdentityManagedFields() {
 		return "", ErrAnthropicStableIdentityOutboundBlocked
 	}
+	if _, err := validatedAccountProxyURL(account); err != nil {
+		return "", err
+	}
 	if account.Platform != PlatformAnthropic || (account.Type != AccountTypeOAuth && account.Type != AccountTypeServiceAccount) {
 		return "", errors.New("not an anthropic oauth or service account")
 	}

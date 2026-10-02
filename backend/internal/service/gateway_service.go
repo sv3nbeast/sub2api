@@ -6127,6 +6127,9 @@ func (s *GatewayService) isModelSupportedByAccount(account *Account, requestedMo
 
 // GetAccessToken 获取账号凭证
 func (s *GatewayService) GetAccessToken(ctx context.Context, account *Account) (string, string, error) {
+	if _, err := validatedAccountProxyURL(account); err != nil {
+		return "", "", err
+	}
 	if account != nil && account.Platform == PlatformKiro {
 		if apiKey := account.KiroAPIKey(); apiKey != "" {
 			return apiKey, "apikey", nil
@@ -7355,7 +7358,7 @@ func isZeroClaudeCodeMimicryConfig(cfg config.GatewayClaudeCodeMimicryConfig) bo
 		!cfg.SyntheticCompanion.FailOpen
 }
 
-func (s *GatewayService) triggerClaudeCodeCompanionProbe(ctx context.Context, account *Account, body []byte, token, tokenType, proxyURL string, tlsProfile *tlsfingerprint.Profile, model string) {
+func (s *GatewayService) triggerClaudeCodeCompanionProbe(ctx context.Context, account *Account, body []byte, token, tokenType string, tlsProfile *tlsfingerprint.Profile, model string) {
 	if s == nil || s.claudeCodeCompanionProbe == nil || s.cfg == nil {
 		return
 	}
@@ -7365,7 +7368,6 @@ func (s *GatewayService) triggerClaudeCodeCompanionProbe(ctx context.Context, ac
 		Body:         body,
 		Token:        token,
 		TokenType:    tokenType,
-		ProxyURL:     proxyURL,
 		TLSProfile:   tlsProfile,
 		SessionID:    sessionID,
 		Config:       s.cfg.Gateway.ClaudeCodeMimicry,
@@ -7711,7 +7713,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		}
 	}
 	if shouldMimicClaudeCode && tokenType == "oauth" && !IsClaudeCodeCompanionProbeTriggered(ctx) {
-		s.triggerClaudeCodeCompanionProbe(ctx, account, body, token, tokenType, proxyURL, tlsProfile, reqModel)
+		s.triggerClaudeCodeCompanionProbe(ctx, account, body, token, tokenType, tlsProfile, reqModel)
 		ctx = WithClaudeCodeCompanionProbeTriggered(ctx)
 	}
 	setOpsUpstreamRequestBody(c, body)

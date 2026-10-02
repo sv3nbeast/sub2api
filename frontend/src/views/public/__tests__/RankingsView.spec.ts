@@ -79,10 +79,10 @@ describe('public RankingsView', () => {
   it('keeps URL period selection and browser back in sync while preserving other query values', async () => {
     const { wrapper, router } = await mountView('/rankings?period=month&source=docs')
     expect(getRankings).toHaveBeenLastCalledWith('month', expect.anything())
-    await wrapper.get('[data-period="year"]').trigger('click')
+    await wrapper.get('[data-period="quarter"]').trigger('click')
     await flushPromises()
-    expect(router.currentRoute.value.query).toEqual({ period: 'year', source: 'docs' })
-    expect(getRankings).toHaveBeenLastCalledWith('year', expect.anything())
+    expect(router.currentRoute.value.query).toEqual({ period: 'quarter', source: 'docs' })
+    expect(getRankings).toHaveBeenLastCalledWith('quarter', expect.anything())
     router.back()
     await flushPromises()
     expect(router.currentRoute.value.query.period).toBe('month')
@@ -107,13 +107,13 @@ describe('public RankingsView', () => {
     const { wrapper, router } = await mountView()
     const oldSignal = getRankings.mock.calls[0][1].signal as AbortSignal
     expect(wrapper.find('[data-testid="rankings-loading"]').exists()).toBe(true)
-    await router.push('/rankings?period=year')
+    await router.push('/rankings?period=quarter')
     await flushPromises()
     expect(oldSignal.aborted).toBe(true)
-    expect(wrapper.get('.chart-stub').attributes('data-period')).toBe('year')
+    expect(wrapper.get('.chart-stub').attributes('data-period')).toBe('quarter')
     old.resolve(rankingsSnapshot('week', { total_tokens: 999 }))
     await flushPromises()
-    expect(wrapper.get('.chart-stub').attributes('data-period')).toBe('year')
+    expect(wrapper.get('.chart-stub').attributes('data-period')).toBe('quarter')
     expect(wrapper.find('[data-testid="rankings-error"]').exists()).toBe(false)
 
     const staleError = deferred<RankingsSnapshot>()
@@ -157,8 +157,8 @@ describe('public RankingsView', () => {
   })
 
   it('uses the complete model count and includes years in a cross-year range', async () => {
-    getRankings.mockResolvedValueOnce(rankingsSnapshot('year', { models_count: 132, start_at: '2025-10-02T00:00:00Z' }))
-    const { wrapper } = await mountView('/rankings?period=year')
+    getRankings.mockResolvedValueOnce(rankingsSnapshot('quarter', { models_count: 132, start_at: '2025-10-02T00:00:00Z' }))
+    const { wrapper } = await mountView('/rankings?period=quarter')
     expect(wrapper.get('.rankings-stat-grid').text()).toContain('132')
     expect(wrapper.get('.rankings-limit-hint').text()).toContain('132 个活跃模型')
     expect(wrapper.get('.rankings-meta').text()).toContain('2025')

@@ -212,6 +212,101 @@ func (r *dashboardAggregationRepository) UpdateAggregationWatermark(ctx context.
 	return err
 }
 
+// ArchivePublicRankings snapshots closed local days before usage_logs retention
+// can remove them. It is called by the existing singleton dashboard scheduler;
+// no trigger or synchronous write-path work is added.
+func (r *dashboardAggregationRepository) ArchivePublicRankings(ctx context.Context, now time.Time) error {
+	if r == nil || r.sql == nil {
+		return nil
+	}
+	db, ok := r.sql.(*sql.DB)
+	if !ok {
+		return nil
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	rollback := func(err error) error {
+		_ = tx.Rollback()
+		return err
+	}
+
+	var startedAt time.Time
+	var lastCompleted time.Time
+	if err := tx.QueryRowContext(ctx, `
+		SELECT recording_started_at, last_completed_date
+		FROM public_rankings_rollup_state
+		WHERE id = 1
+		FOR UPDATE
+	`).Scan(&startedAt, &lastCompleted); err != nil {
+		return rollback(err)
+	}
+	loc := timezone.Location()
+	nowLocal := now.In(loc)
+	yesterday := truncateToDay(nowLocal).AddDate(0, 0, -1)
+	// Preserve the exact activation instant for the first partial day. Later
+	// batches resume at a closed local-day boundary using the watermark.
+	startAt := startedAt.In(loc)
+	if !lastCompleted.IsZero() {
+		candidate := truncateToDay(lastCompleted.In(loc)).AddDate(0, 0, 1)
+		if candidate.After(startAt) {
+			startAt = candidate
+		}
+	}
+	endDate := yesterday.AddDate(0, 0, 1)
+	if !startAt.Before(endDate) {
+		return tx.Commit()
+	}
+	// Keep one scheduler tick bounded when an instance was offline for a long
+	// time; the state watermark lets the next tick continue safely.
+	if maxEnd := startAt.AddDate(0, 0, 31); endDate.After(maxEnd) {
+		endDate = maxEnd
+	}
+	endAt := endDate
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO public_rankings_daily_rollups (
+			bucket_date, requested_model, creator_model,
+			input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, requests, computed_at
+		)
+		SELECT
+			(ul.created_at AT TIME ZONE $3)::date,
+			COALESCE(NULLIF(BTRIM(ul.requested_model), ''), ul.model),
+			COALESCE(NULLIF(BTRIM(ul.upstream_model), ''), ul.model),
+			SUM(GREATEST(ul.input_tokens, 0)),
+			SUM(GREATEST(ul.output_tokens, 0)),
+			SUM(GREATEST(ul.cache_creation_tokens, 0)),
+			SUM(GREATEST(ul.cache_read_tokens, 0)),
+			COUNT(*), NOW()
+		FROM usage_logs ul
+		JOIN groups g ON g.id = ul.group_id
+			AND g.is_exclusive = FALSE
+			AND g.deleted_at IS NULL
+			AND g.status = 'active'
+		WHERE ul.created_at >= $1 AND ul.created_at < $2
+		GROUP BY 1, 2, 3
+		ON CONFLICT (bucket_date, requested_model, creator_model)
+		DO UPDATE SET
+			input_tokens = EXCLUDED.input_tokens,
+			output_tokens = EXCLUDED.output_tokens,
+			cache_creation_tokens = EXCLUDED.cache_creation_tokens,
+			cache_read_tokens = EXCLUDED.cache_read_tokens,
+			requests = EXCLUDED.requests,
+			computed_at = EXCLUDED.computed_at
+	`, startAt, endAt, timezone.Name()); err != nil {
+		return rollback(err)
+	}
+	completedThrough := endDate.AddDate(0, 0, -1)
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE public_rankings_rollup_state
+		SET last_completed_date = $1, updated_at = NOW()
+		WHERE id = 1
+	`, completedThrough); err != nil {
+		return rollback(err)
+	}
+	return tx.Commit()
+}
+
 func (r *dashboardAggregationRepository) CleanupAggregates(ctx context.Context, hourlyCutoff, dailyCutoff time.Time) error {
 	hourlyCutoffUTC := hourlyCutoff.UTC()
 	dailyCutoffUTC := dailyCutoff.UTC()

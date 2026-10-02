@@ -24,7 +24,7 @@ describe('rankings public API', () => {
   })
 
   it('normalizes unsupported URL values to the default without guessing', () => {
-    expect(normalizeRankingPeriod('year')).toBe('year')
+    expect(normalizeRankingPeriod('quarter')).toBe('quarter')
     expect(normalizeRankingPeriod('all')).toBe('week')
     expect(normalizeRankingPeriod(['month', 'year'])).toBe('week')
     expect(normalizeRankingPeriod(null)).toBe('week')

@@ -23,6 +23,10 @@ func (h *RankingsHandler) Get(c *gin.Context) {
 		response.BadRequest(c, service.ErrInvalidRankingsPeriod.Error())
 		return
 	}
+	if errors.Is(err, service.ErrRankingsYearUnavailable) {
+		response.Error(c, http.StatusNotFound, "Year rankings are not available yet.")
+		return
+	}
 	if err != nil {
 		slog.Warn("rankings.aggregate_unavailable", "error", err)
 		c.Header("Retry-After", "5")

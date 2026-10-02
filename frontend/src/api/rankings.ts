@@ -1,7 +1,8 @@
 import { apiClient } from './client'
 
-export const RANKING_PERIODS = ['today', 'week', 'month', 'year'] as const
-export type RankingPeriod = typeof RANKING_PERIODS[number]
+export const RANKING_PERIODS = ['today', 'week', 'month', 'quarter'] as const
+export const SUPPORTED_RANKING_PERIODS = [...RANKING_PERIODS, 'year'] as const
+export type RankingPeriod = typeof SUPPORTED_RANKING_PERIODS[number]
 
 export interface RankedModel {
   rank: number
@@ -62,13 +63,13 @@ export interface RankingsSnapshot {
 }
 
 export function normalizeRankingPeriod(value: unknown): RankingPeriod {
-  return RANKING_PERIODS.includes(value as RankingPeriod) ? value as RankingPeriod : 'week'
+  return RANKING_PERIODS.includes(value as typeof RANKING_PERIODS[number]) ? value as RankingPeriod : 'week'
 }
 
 function assertRankingsSnapshot(value: unknown): asserts value is RankingsSnapshot {
   const candidate = value as Partial<RankingsSnapshot> | null
   if (!candidate || typeof candidate !== 'object'
-    || !RANKING_PERIODS.includes(candidate.period as RankingPeriod)
+    || !SUPPORTED_RANKING_PERIODS.includes(candidate.period as RankingPeriod)
     || !Number.isFinite(candidate.total_tokens)
     || !Number.isFinite(candidate.total_requests)
     || !Number.isFinite(candidate.models_count)

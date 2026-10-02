@@ -18,6 +18,45 @@ func (f rankingsRepoFunc) Aggregate(ctx context.Context, r RankingsRange) ([]Ran
 	return f(ctx, r)
 }
 
+type rankingsArchiveRepo struct {
+	aggregate rankingsRepoFunc
+	startedAt time.Time
+	completed time.Time
+}
+
+func (r rankingsArchiveRepo) Aggregate(ctx context.Context, bounds RankingsRange) ([]RankingsBucket, error) {
+	return r.aggregate(ctx, bounds)
+}
+
+func (r rankingsArchiveRepo) RankingsArchiveCoverage(context.Context) (time.Time, time.Time, error) {
+	return r.startedAt, r.completed, nil
+}
+
+func TestRankingsService_YearUnavailableUntilFullRecordingWindow(t *testing.T) {
+	svc := NewRankingsService(rankingsRepoFunc(func(context.Context, RankingsRange) ([]RankingsBucket, error) {
+		t.Fatal("year query must not reach aggregate before archive coverage is ready")
+		return nil, nil
+	}))
+	svc.clock = func() time.Time { return time.Date(2026, 12, 2, 12, 0, 0, 0, time.UTC) }
+	svc.location = func() *time.Location { return time.UTC }
+	_, err := svc.Get(context.Background(), "year")
+	require.ErrorIs(t, err, ErrRankingsYearUnavailable)
+
+	ready := NewRankingsService(rankingsArchiveRepo{
+		aggregate: func(_ context.Context, bounds RankingsRange) ([]RankingsBucket, error) {
+			require.True(t, bounds.UseArchive)
+			require.Equal(t, time.Date(2026, 12, 2, 0, 0, 0, 0, time.UTC).AddDate(0, 0, -89), bounds.ArchiveCutoff)
+			return nil, nil
+		},
+		startedAt: time.Date(2025, 12, 1, 12, 0, 0, 0, time.UTC),
+		completed: time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC),
+	})
+	ready.clock = svc.clock
+	ready.location = svc.location
+	_, err = ready.Get(context.Background(), "year")
+	require.NoError(t, err)
+}
+
 func TestRankingsPeriodRange_LocalCalendarAndDST(t *testing.T) {
 	loc, err := time.LoadLocation("America/New_York")
 	require.NoError(t, err)
@@ -26,7 +65,7 @@ func TestRankingsPeriodRange_LocalCalendarAndDST(t *testing.T) {
 		period      string
 		days        int
 		granularity string
-	}{{"today", 1, "hour"}, {"week", 7, "day"}, {"month", 30, "day"}, {"year", 365, "month"}} {
+	}{{"today", 1, "hour"}, {"week", 7, "day"}, {"month", 30, "day"}, {"quarter", 90, "day"}, {"year", 365, "month"}} {
 		t.Run(tc.period, func(t *testing.T) {
 			r, err := RankingsPeriodRange(tc.period, now, loc)
 			require.NoError(t, err)
@@ -391,11 +430,11 @@ func TestRankingsService_QueueTimeoutIsBoundedAndNegativelyCached(t *testing.T) 
 	svc := NewRankingsService(rankingsRepoFunc(func(context.Context, RankingsRange) ([]RankingsBucket, error) { calls.Add(1); return nil, nil }))
 	svc.queryTimeout = 20 * time.Millisecond
 	svc.querySlot <- struct{}{}
-	_, err := svc.Get(context.Background(), "year")
+	_, err := svc.Get(context.Background(), "quarter")
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	<-svc.querySlot
 	// Even after the slot opens, a burst of retries must not start another scan.
-	_, err = svc.Get(context.Background(), "year")
+	_, err = svc.Get(context.Background(), "quarter")
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Equal(t, int32(0), calls.Load())
 }
@@ -417,7 +456,7 @@ func TestRankingsService_DifferentPeriodsShareOneDatabaseSlot(t *testing.T) {
 		return nil, nil
 	}))
 	var wg sync.WaitGroup
-	for _, period := range []string{"today", "week", "month", "year"} {
+	for _, period := range []string{"today", "week", "month", "quarter"} {
 		wg.Add(1)
 		go func(p string) { defer wg.Done(); _, err := svc.Get(context.Background(), p); require.NoError(t, err) }(period)
 	}

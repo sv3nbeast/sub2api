@@ -50,6 +50,13 @@ type DashboardAggregationRepository interface {
 	EnsureUsageLogsPartitions(ctx context.Context, now time.Time) error
 }
 
+// PublicRankingsArchiveRepository is implemented by the dashboard repository
+// so the existing singleton scheduler can persist closed public model buckets
+// without adding work to the request or usage-write paths.
+type PublicRankingsArchiveRepository interface {
+	ArchivePublicRankings(context.Context, time.Time) error
+}
+
 // DashboardAggregationService 负责定时聚合与回填。
 type DashboardAggregationService struct {
 	repo                 DashboardAggregationRepository
@@ -258,6 +265,9 @@ func (s *DashboardAggregationService) runScheduledAggregation() {
 		logger.LegacyPrintf("service.dashboard_aggregation", "[DashboardAggregation] 聚合失败: %v", err)
 		return
 	}
+	if err := s.archivePublicRankings(ctx, now); err != nil {
+		logger.LegacyPrintf("service.dashboard_aggregation", "[DashboardAggregation] 公开排行榜历史归档失败: %v", err)
+	}
 
 	updateErr := s.repo.UpdateAggregationWatermark(ctx, now)
 	if updateErr != nil {
@@ -271,6 +281,14 @@ func (s *DashboardAggregationService) runScheduledAggregation() {
 	)
 
 	s.maybeCleanupRetention(ctx, now)
+}
+
+func (s *DashboardAggregationService) archivePublicRankings(ctx context.Context, now time.Time) error {
+	repo, ok := s.repo.(PublicRankingsArchiveRepository)
+	if !ok {
+		return nil
+	}
+	return repo.ArchivePublicRankings(ctx, now)
 }
 
 func (s *DashboardAggregationService) runScheduledGroupUsageSync() {

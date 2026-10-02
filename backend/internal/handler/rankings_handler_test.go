@@ -44,7 +44,7 @@ func TestRankingsHandler_PublicEnvelopeDefaultPeriodAndValidation(t *testing.T) 
 	require.Equal(t, "anthropic", envelope.Data.Models[0].VendorID)
 	require.NotContains(t, w.Body.String(), "user_id")
 	require.NotContains(t, w.Body.String(), "account_id")
-	for _, period := range []string{"quarter", "TODAY", "week%27"} {
+	for _, period := range []string{"year%27", "TODAY", "week%27"} {
 		w = httptest.NewRecorder()
 		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/rankings?period="+period, nil))
 		require.Equal(t, http.StatusBadRequest, w.Code)
@@ -58,7 +58,7 @@ func TestRankingsHandler_FailureIsSanitizedAndRetryable(t *testing.T) {
 	h := NewRankingsHandler(service.NewRankingsService(&rankingsHandlerRepo{err: errors.New("secret db host/key")}))
 	r.GET("/api/v1/rankings", h.Get)
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/rankings?period=year", nil))
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/rankings?period=quarter", nil))
 	require.Equal(t, http.StatusServiceUnavailable, w.Code)
 	require.Equal(t, "5", w.Header().Get("Retry-After"))
 	require.NotContains(t, w.Body.String(), "secret")

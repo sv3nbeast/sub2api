@@ -71,3 +71,30 @@ func TestRankingsRepository_DatabaseFailureAndBadScan(t *testing.T) {
 		})
 	}
 }
+
+func TestRankingsRepository_YearUsesArchiveBeforeRecentRawCutoff(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+	loc := time.FixedZone("CST", 8*3600)
+	now := time.Date(2027, 10, 2, 12, 0, 0, 0, loc)
+	bounds, err := service.RankingsPeriodRange("year", now, loc)
+	require.NoError(t, err)
+	bounds.UseArchive = true
+	bounds.ArchiveCutoff = time.Date(2027, 7, 5, 0, 0, 0, 0, loc)
+	cols := []string{"bucket", "model_name", "creator_model", "previous", "input", "output", "cache_read", "cache_creation", "requests"}
+	mock.ExpectQuery(regexp.QuoteMeta(RankingsArchiveAggregateSQL)).WithArgs(
+		bounds.Start, bounds.End, bounds.ComparisonStart, bounds.ComparisonEnd, bounds.Timezone, bounds.Granularity, bounds.ArchiveCutoff,
+	).WillReturnRows(sqlmock.NewRows(cols).AddRow(bounds.Start.UTC(), "claude-opus-5", "claude-opus-5", false, int64(10), int64(5), int64(2), int64(1), int64(1)))
+
+	rows, err := NewRankingsRepository(db).Aggregate(context.Background(), bounds)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, "claude-opus-5", rows[0].Model)
+	require.NoError(t, mock.ExpectationsWereMet())
+	query := strings.Join(strings.Fields(RankingsArchiveAggregateSQL), " ")
+	require.Contains(t, query, "FROM public_rankings_daily_rollups ar")
+	require.Contains(t, query, "FROM usage_logs ul")
+	require.Contains(t, query, "ar.bucket_date < $7::date")
+	require.Contains(t, query, "ul.created_at >= $7")
+}

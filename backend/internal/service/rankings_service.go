@@ -12,7 +12,8 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-var ErrInvalidRankingsPeriod = errors.New("period must be today, week, month or year")
+var ErrInvalidRankingsPeriod = errors.New("period must be today, week, month, quarter or year")
+var ErrRankingsYearUnavailable = errors.New("year rankings are not available until a full year has been recorded")
 
 const (
 	rankingsMaxModels      = 100
@@ -26,6 +27,8 @@ const (
 type RankingsRange struct {
 	Start, End, ComparisonStart, ComparisonEnd time.Time
 	Timezone, Granularity                      string
+	UseArchive                                 bool
+	ArchiveCutoff                              time.Time
 }
 
 type RankingsBucket struct {
@@ -37,6 +40,12 @@ type RankingsBucket struct {
 
 type RankingsRepository interface {
 	Aggregate(context.Context, RankingsRange) ([]RankingsBucket, error)
+}
+
+// RankingsArchiveCoverage is optional so lightweight test repositories and
+// deployments without the history migration fail closed for the year view.
+type RankingsArchiveCoverage interface {
+	RankingsArchiveCoverage(context.Context) (startedAt time.Time, lastCompletedDate time.Time, err error)
 }
 
 type RankingsModel struct {
@@ -135,6 +144,24 @@ func (s *RankingsService) Get(ctx context.Context, period string) (*RankingsSnap
 	if err != nil {
 		return nil, err
 	}
+	if period == "year" {
+		coverage, ok := s.repo.(RankingsArchiveCoverage)
+		if !ok {
+			return nil, ErrRankingsYearUnavailable
+		}
+		startedAt, lastCompletedDate, coverageErr := coverage.RankingsArchiveCoverage(ctx)
+		if coverageErr != nil {
+			return nil, coverageErr
+		}
+		localNow := now.In(s.location())
+		availableAt := time.Date(startedAt.In(s.location()).Year(), startedAt.In(s.location()).Month(), startedAt.In(s.location()).Day(), 0, 0, 0, 0, s.location()).AddDate(1, 0, 0)
+		if startedAt.IsZero() || localNow.Before(availableAt) || lastCompletedDate.Before(window.Start.In(s.location()).AddDate(0, 0, -1)) {
+			return nil, ErrRankingsYearUnavailable
+		}
+		window.UseArchive = true
+		today := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, s.location())
+		window.ArchiveCutoff = today.AddDate(0, 0, -89)
+	}
 	key := period + ":" + window.Timezone + ":" + window.End.Format("2006-01-02")
 	if entry, ok := s.cached(key, now); ok {
 		return entry.snapshot, entry.err
@@ -212,6 +239,8 @@ func RankingsPeriodRange(period string, now time.Time, loc *time.Location) (Rank
 		days = 7
 	case "month":
 		days = 30
+	case "quarter":
+		days = 90
 	case "year":
 		days, granularity = 365, "month"
 	default:

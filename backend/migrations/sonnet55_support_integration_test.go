@@ -72,7 +72,7 @@ func TestSonnet55Migration(t *testing.T) {
  INSERT INTO channel_account_stats_pricing_intervals(pricing_id,min_tokens,max_tokens,input_price) VALUES(910,0,5000,.000888),(920,0,6000,.000999);
  `)
 	require.NoError(t, err)
-	migration, err := FS.ReadFile("251_add_claude_sonnet55_support.sql")
+	migration, err := FS.ReadFile("252_add_claude_sonnet55_support.sql")
 	require.NoError(t, err)
 	run := func() {
 		tx, e := db.BeginTx(ctx, nil)

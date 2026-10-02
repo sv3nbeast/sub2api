@@ -50,6 +50,7 @@ import alipayIcon from '@/assets/icons/alipay.svg'
 import wxpayIcon from '@/assets/icons/wxpay.svg'
 import stripeIcon from '@/assets/icons/stripe.svg'
 import airwallexIcon from '@/assets/icons/airwallex.svg'
+import bscIcon from '@/assets/icons/bsc.svg'
 import paymentIcon from '@/assets/icons/payment.svg'
 
 export interface PaymentMethodOption {
@@ -76,9 +77,10 @@ const METHOD_ICONS: Record<string, string> = {
   stripe: stripeIcon,
   airwallex: airwallexIcon,
   credit_card: paymentIcon,
-  // No dedicated USDT/BEP20 brand asset ships with the repo yet; the generic
-  // payment mark is the intended stand-in rather than an accidental fallback.
-  usdt_bep20: paymentIcon,
+  // USDT on BNB Smart Chain. The chain mark (not the Tether mark) is the right
+  // symbol here: this method's identity is "which network you pay on", and the
+  // label already spells out the asset in parentheses.
+  usdt_bep20: bscIcon,
 }
 
 const sortedMethods = computed(() => {

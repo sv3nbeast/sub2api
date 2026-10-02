@@ -241,6 +241,7 @@ func ProvideHandlers(
 	statusHandler *StatusHandler,
 	availableChannelHandler *AvailableChannelHandler,
 	modelPlazaHandler *ModelPlazaHandler,
+	rankingsHandler *RankingsHandler,
 	asyncImageHandler *AsyncImageHandler,
 	batchImageHandler *BatchImageHandler,
 	_ *service.IdempotencyCoordinator,
@@ -269,6 +270,7 @@ func ProvideHandlers(
 		PaymentWebhook:       paymentWebhookHandler,
 		AvailableChannel:     availableChannelHandler,
 		ModelPlaza:           modelPlazaHandler,
+		Rankings:             rankingsHandler,
 		Status:               statusHandler,
 		AsyncImage:           asyncImageHandler,
 		BatchImage:           batchImageHandler,
@@ -298,6 +300,7 @@ var ProviderSet = wire.NewSet(
 	ProvideSettingHandler,
 	NewAvailableChannelHandler,
 	NewModelPlazaHandler,
+	NewRankingsHandler,
 	NewAsyncImageHandler,
 	NewBatchImageHandler,
 

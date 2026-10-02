@@ -219,6 +219,16 @@ const routes: RouteRecordRaw[] = [
       titleKey: 'modelMarket.title'
     }
   },
+  {
+    path: '/rankings',
+    name: 'Rankings',
+    component: () => import('@/views/public/RankingsView.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'Model Usage Rankings',
+      titleKey: 'rankings.title'
+    }
+  },
 
   // ==================== User Routes ====================
   {

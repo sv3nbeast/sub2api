@@ -189,6 +189,7 @@ const visibleNavigation = computed<PublicNavigationItem[]>(() => {
       icon: 'cube',
       enabled: isFeatureFlagEnabled(FeatureFlags.publicModelMarket),
     },
+    { to: '/rankings', label: t('rankings.navLabel'), icon: 'trophy' },
     { to: '/monitor', label: t('nav.modelStatus'), icon: 'chart', wideOnly: true },
     { to: '/docs', label: t('nav.docs'), icon: 'book', wideOnly: true },
   ]

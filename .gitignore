@@ -121,6 +121,7 @@ CLAUDE.md
 .claude
 scripts/*
 !scripts/audit_claude_cli_mimicry.py
+!scripts/preview_rankings.py
 !scripts/deploy-prod.sh
 !scripts/mitm_claude_flow_summary.py
 !scripts/rebuild-prod-sub2api.sh
@@ -154,6 +155,7 @@ docs/*
 !docs/ASYNC_IMAGE_TASKS.md
 !docs/BATCH_IMAGE_MVP.md
 !docs/COMPOSITE_GROUPS.md
+!docs/MODEL_RANKINGS.md
 !docs/PLUGIN_DEVELOPMENT.md
 !docs/channel-monitor-v2-safe-defaults.md
 !docs/codex-credits.md

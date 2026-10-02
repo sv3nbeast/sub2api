@@ -797,6 +797,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
+    { path: '/rankings', label: t('rankings.navLabel'), icon: ChartIcon },
     { path: '/channel-status', label: t('nav.modelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor },
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true, featureFlag: flagSubscription },
     { path: '/purchase', label: purchaseNavLabel.value, icon: RechargeSubscriptionIcon, hideInSimpleMode: true, featureFlag: flagPayment },
@@ -836,7 +837,7 @@ const userNavSections = computed<NavSection[]>(() => {
     {
       key: 'models',
       title: t('nav.sectionModels'),
-      items: bucket(['/available-channels', '/channel-status']),
+      items: bucket(['/available-channels', '/rankings', '/channel-status']),
     },
     {
       key: 'billing',
@@ -857,6 +858,7 @@ const userNavSections = computed<NavSection[]>(() => {
           '/keys',
           '/usage',
           '/available-channels',
+          '/rankings',
           '/channel-status',
           '/subscriptions',
           '/purchase',

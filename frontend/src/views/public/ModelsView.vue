@@ -44,6 +44,9 @@
           <p class="mt-2 max-w-3xl text-sm leading-6 text-gray-600 dark:text-gray-300 sm:text-base">{{ t('modelMarket.description') }}</p>
         </div>
         <div class="flex flex-wrap gap-2">
+          <RouterLink to="/rankings" class="btn btn-secondary px-4 py-2 text-sm">
+            <Icon name="trophy" size="sm" />{{ t('rankings.discover') }}
+          </RouterLink>
           <RouterLink v-if="isAuthenticated" to="/available-channels" class="btn btn-primary px-4 py-2 text-sm">
             {{ t('modelMarket.actions.myGroups') }}
             <Icon name="arrowRight" size="sm" />

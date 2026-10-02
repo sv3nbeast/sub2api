@@ -11,8 +11,10 @@ import adminPromptAuditMessages from './en/admin/promptAudit'
 import adminSettingsMessages from './en/admin/settings'
 import batchImageMessages from './en/batchImage'
 import workspaceMessages from './en/workspace'
+import rankingsMessages from './en/rankings'
 
 const baseMessages = {
+  ...rankingsMessages,
   // Home Page
   home: {
     viewOnGithub: 'View on GitHub',

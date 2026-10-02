@@ -11,8 +11,10 @@ import adminPromptAuditMessages from './zh/admin/promptAudit'
 import adminSettingsMessages from './zh/admin/settings'
 import batchImageMessages from './zh/batchImage'
 import workspaceMessages from './zh/workspace'
+import rankingsMessages from './zh/rankings'
 
 const baseMessages = {
+  ...rankingsMessages,
   // Home Page
   home: {
     viewOnGithub: '在 GitHub 上查看',

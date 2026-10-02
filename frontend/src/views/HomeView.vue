@@ -57,6 +57,9 @@
             <Icon v-if="isDark" name="sun" size="md" />
             <Icon v-else name="moon" size="md" />
           </button>
+          <router-link to="/rankings" class="flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100 dark:text-dark-400 dark:hover:bg-dark-800">
+            <Icon name="trophy" size="md" /><span>{{ t('rankings.navLabel') }}</span>
+          </router-link>
           <router-link
             :to="isAuthenticated ? dashboardPath : '/login'"
             class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
@@ -115,6 +118,9 @@
             class="home-nav-text-link hidden sm:inline-flex"
           >
             {{ t('modelMarket.navLabel') }}
+          </router-link>
+          <router-link to="/rankings" class="home-nav-text-link hidden sm:inline-flex">
+            {{ t('rankings.navLabel') }}
           </router-link>
           <router-link
             to="/monitor"

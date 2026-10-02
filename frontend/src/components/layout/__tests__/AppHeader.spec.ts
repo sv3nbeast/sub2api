@@ -91,7 +91,10 @@ describe('AppHeader', () => {
           AnnouncementBell: true,
           Icon: true,
           LocaleSwitcher: true,
-          RouterLink: { template: '<a><slot /></a>' },
+          RouterLink: {
+            props: ['to'],
+            template: '<a :data-to="to"><slot /></a>',
+          },
           SubscriptionProgressMini: true,
         },
       },
@@ -100,5 +103,25 @@ describe('AppHeader', () => {
     const status = wrapper.get('.ui-v2-topbar-context')
     expect(status.classes()).toContain('is-degraded')
     expect(status.text()).toContain('status.degraded')
+  })
+
+  it('exposes rankings and model status next to the model catalog', () => {
+    const wrapper = mount(AppHeader, {
+      global: {
+        stubs: {
+          AnnouncementBell: true,
+          Icon: true,
+          LocaleSwitcher: true,
+          RouterLink: {
+            props: ['to'],
+            template: '<a :data-to="to"><slot /></a>',
+          },
+          SubscriptionProgressMini: true,
+        },
+      },
+    })
+
+    expect(wrapper.get('[data-to="/rankings"]').text()).toContain('rankings.navLabel')
+    expect(wrapper.get('[data-to="/channel-status"]').text()).toContain('nav.modelStatus')
   })
 })

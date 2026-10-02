@@ -33,6 +33,7 @@ func TestRankingsHandler_PublicEnvelopeDefaultPeriodAndValidation(t *testing.T) 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/rankings", nil))
 	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "public, max-age=60, stale-while-revalidate=120", w.Header().Get("Cache-Control"))
 	var envelope struct {
 		Code int                      `json:"code"`
 		Data service.RankingsSnapshot `json:"data"`
@@ -60,6 +61,7 @@ func TestRankingsHandler_FailureIsSanitizedAndRetryable(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/rankings?period=quarter", nil))
 	require.Equal(t, http.StatusServiceUnavailable, w.Code)
+	require.Empty(t, w.Header().Get("Cache-Control"), "failed snapshots must not be cached")
 	require.Equal(t, "5", w.Header().Get("Retry-After"))
 	require.NotContains(t, w.Body.String(), "secret")
 }

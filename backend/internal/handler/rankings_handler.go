@@ -18,7 +18,8 @@ func NewRankingsHandler(rankings *service.RankingsService) *RankingsHandler {
 
 // Get publishes aggregate usage only. Database/network details stay in logs.
 func (h *RankingsHandler) Get(c *gin.Context) {
-	snapshot, err := h.service.Get(c.Request.Context(), c.DefaultQuery("period", "week"))
+	period := c.DefaultQuery("period", "week")
+	snapshot, err := h.service.Get(c.Request.Context(), period)
 	if errors.Is(err, service.ErrInvalidRankingsPeriod) {
 		response.BadRequest(c, service.ErrInvalidRankingsPeriod.Error())
 		return
@@ -33,8 +34,20 @@ func (h *RankingsHandler) Get(c *gin.Context) {
 		response.Error(c, http.StatusServiceUnavailable, "Rankings are temporarily unavailable. Please try again shortly.")
 		return
 	}
-	// Application snapshots have their own period-dependent TTL. Avoid caching
-	// yesterday's page across the configured timezone's midnight boundary.
-	c.Header("Cache-Control", "no-cache")
+	// The response is aggregate public data, so browsers and a front proxy can
+	// reuse it while the service-level snapshot cache avoids repeated database
+	// scans. Keep the edge TTL aligned with the server cache for each period.
+	c.Header("Cache-Control", rankingsCacheControl(period))
 	response.Success(c, snapshot)
+}
+
+func rankingsCacheControl(period string) string {
+	switch period {
+	case "year":
+		return "public, max-age=900, stale-while-revalidate=1800"
+	case "month":
+		return "public, max-age=300, stale-while-revalidate=600"
+	default:
+		return "public, max-age=60, stale-while-revalidate=120"
+	}
 }

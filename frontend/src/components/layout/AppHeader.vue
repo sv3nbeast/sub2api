@@ -86,6 +86,29 @@
           <span class="hidden sm:inline">{{ t('modelMarket.navLabel') }}</span>
         </router-link>
 
+        <!-- Usage rankings and model status are console resources alongside the model catalog. -->
+        <router-link
+          v-if="user"
+          to="/rankings"
+          :title="t('rankings.navLabel')"
+          :aria-label="t('rankings.navLabel')"
+          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
+        >
+          <Icon name="trophy" size="sm" />
+          <span class="hidden sm:inline">{{ t('rankings.navLabel') }}</span>
+        </router-link>
+
+        <router-link
+          v-if="user && channelMonitorEnabled"
+          to="/channel-status"
+          :title="t('nav.modelStatus')"
+          :aria-label="t('nav.modelStatus')"
+          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
+        >
+          <Icon name="chart" size="sm" />
+          <span class="hidden sm:inline">{{ t('nav.modelStatus') }}</span>
+        </router-link>
+
         <!-- Language Switcher -->
         <LocaleSwitcher class="header-locale" appearance="icon" />
 
@@ -397,6 +420,7 @@ const { beginSheetDrag, moveSheetDrag, endSheetDrag, cancelSheetDrag } = useBott
 const contactInfo = computed(() => appStore.contactInfo)
 const docUrl = computed(() => sanitizeUrl(appStore.docUrl))
 const modelMarketEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.publicModelMarket))
+const channelMonitorEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.channelMonitor))
 const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '/logo.png', { allowRelative: true, allowDataUrl: true }))
 const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
 const availableBalance = computed(() => Number(user.value?.balance || 0))

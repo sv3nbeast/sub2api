@@ -39,6 +39,7 @@
           :placeholder="placeholderText"
           class="input w-full py-3 pl-12 pr-4 text-base font-semibold"
           @input="handleInput"
+          @blur="commitAmount"
         />
       </div>
     </div>
@@ -80,6 +81,9 @@ const placeholderText = computed(() => {
   return t('payment.enterAmount')
 })
 
+// 0 means "no floor configured"; a real floor is always positive.
+const hasMin = computed(() => Number.isFinite(props.min) && props.min > 0)
+
 const AMOUNT_PATTERN = /^\d*(\.\d{0,2})?$/
 
 function selectAmount(amt: number) {
@@ -104,6 +108,20 @@ function handleInput(e: Event) {
     emit('update:modelValue', num)
   } else {
     emit('update:modelValue', null)
+  }
+}
+
+// The floor is enforced on blur rather than on every keystroke: typing "100"
+// passes through "1", and clamping mid-entry would make the value impossible to
+// finish entering. An out-of-range value is also announced to the parent so the
+// page can show the reason instead of silently submitting.
+function commitAmount() {
+  if (!hasMin.value) return
+  const num = parseFloat(customText.value)
+  if (isNaN(num) || num <= 0) return
+  if (num < props.min) {
+    customText.value = String(props.min)
+    emit('update:modelValue', props.min)
   }
 }
 

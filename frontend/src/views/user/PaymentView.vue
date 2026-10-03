@@ -606,6 +606,8 @@ function createEmptyCheckoutInfo(): CheckoutInfoResponse {
     methods: {},
     global_min: 0,
     global_max: 0,
+    min_amount: 0,
+    max_amount: 0,
     plans: [],
     balance_disabled: false,
     balance_recharge_multiplier: 1,
@@ -683,17 +685,30 @@ function amountFitsMethod(amt: number, methodType: string): boolean {
 }
 
 // Visible methods decide the amount range shown to users.
+//
+// The method limits are a UNION across instances, so they widen rather than
+// narrow: an instance with no configured limit returns 0 here and erases the
+// floor entirely. The admin-level MIN_RECHARGE_AMOUNT is a separate, always-on
+// constraint that the backend enforces on every order, so it has to be folded
+// in — otherwise the page lets the user submit an amount it already knows the
+// server will reject.
 const globalMinAmount = computed(() => {
+  const configured = Number(checkout.value.min_amount) || 0
   const limits = Object.values(visibleMethods.value)
-  if (limits.length === 0) return 0
-  if (limits.some(limit => limit.single_min <= 0)) return 0
-  return Math.min(...limits.map(limit => limit.single_min))
+  const methodMin = limits.length === 0 || limits.some(limit => limit.single_min <= 0)
+    ? 0
+    : Math.min(...limits.map(limit => limit.single_min))
+  return Math.max(configured, methodMin)
 })
 const globalMaxAmount = computed(() => {
+  const configured = Number(checkout.value.max_amount) || 0
   const limits = Object.values(visibleMethods.value)
-  if (limits.length === 0) return 0
-  if (limits.some(limit => limit.single_max <= 0)) return 0
-  return Math.max(...limits.map(limit => limit.single_max))
+  const methodMax = limits.length === 0 || limits.some(limit => limit.single_max <= 0)
+    ? 0
+    : Math.max(...limits.map(limit => limit.single_max))
+  if (configured <= 0) return methodMax
+  if (methodMax <= 0) return configured
+  return Math.min(configured, methodMax)
 })
 
 // Selected method's limits (for validation and error messages)
@@ -787,6 +802,16 @@ const totalAmount = computed(() =>
 
 const amountError = computed(() => {
   if (validAmount.value <= 0) return ''
+  // Admin-configured floor/ceiling apply to every method, so they are checked
+  // before the per-method limits: reporting "no method available" for an amount
+  // that is simply below the site minimum would send the user hunting for a
+  // different payment method instead of raising the amount.
+  if (globalMinAmount.value > 0 && validAmount.value < globalMinAmount.value) {
+    return t('payment.amountTooLow', { min: formatSelectedPaymentAmount(globalMinAmount.value) })
+  }
+  if (globalMaxAmount.value > 0 && validAmount.value > globalMaxAmount.value) {
+    return t('payment.amountTooHigh', { max: formatSelectedPaymentAmount(globalMaxAmount.value) })
+  }
   // No method can handle this amount
   if (!enabledMethods.value.some((m) => amountFitsMethod(validAmount.value, m))) {
     return t('payment.amountNoMethod')
@@ -802,6 +827,8 @@ const amountError = computed(() => {
 
 const canSubmit = computed(() =>
   validAmount.value > 0
+    && (globalMinAmount.value <= 0 || validAmount.value >= globalMinAmount.value)
+    && (globalMaxAmount.value <= 0 || validAmount.value <= globalMaxAmount.value)
     && amountFitsMethod(validAmount.value, selectedMethod.value)
     && selectedLimit.value?.available !== false
 )

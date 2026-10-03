@@ -121,8 +121,16 @@ func (s *PaymentService) validateOrderInput(ctx context.Context, req CreateOrder
 	if math.IsNaN(req.Amount) || math.IsInf(req.Amount, 0) || req.Amount <= 0 {
 		return nil, infraerrors.BadRequest("INVALID_AMOUNT", "amount must be a positive number")
 	}
-	if (cfg.MinAmount > 0 && req.Amount < cfg.MinAmount) || (cfg.MaxAmount > 0 && req.Amount > cfg.MaxAmount) {
-		return nil, infraerrors.BadRequest("INVALID_AMOUNT", "amount out of range").
+	// Split the range failure by direction. A single INVALID_AMOUNT for both
+	// bounds forces one string to cover "too small" and "too large" at once, so
+	// the localized copy can only ever say something vague like "invalid
+	// amount" — the actual bound is what the user needs to act on.
+	if cfg.MinAmount > 0 && req.Amount < cfg.MinAmount {
+		return nil, infraerrors.BadRequest("AMOUNT_BELOW_MIN", "amount is below the minimum").
+			WithMetadata(map[string]string{"min": fmt.Sprintf("%.2f", cfg.MinAmount), "max": fmt.Sprintf("%.2f", cfg.MaxAmount)})
+	}
+	if cfg.MaxAmount > 0 && req.Amount > cfg.MaxAmount {
+		return nil, infraerrors.BadRequest("AMOUNT_ABOVE_MAX", "amount exceeds the maximum").
 			WithMetadata(map[string]string{"min": fmt.Sprintf("%.2f", cfg.MinAmount), "max": fmt.Sprintf("%.2f", cfg.MaxAmount)})
 	}
 	return nil, nil

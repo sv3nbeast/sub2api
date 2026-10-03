@@ -35,3 +35,49 @@ describe('recharge amount input', () => {
     expect((input.element as HTMLInputElement).value).toBe('')
   })
 })
+
+describe('minimum amount floor', () => {
+  // The floor is applied on blur, not on input: clamping during typing would
+  // make a value like "100" impossible to enter, since it passes through "1".
+  it('leaves a below-minimum value alone while the user is still typing', async () => {
+    const wrapper = mount(AmountInput, { props: { modelValue: null, min: 10 } })
+    const input = wrapper.get('input')
+    await input.setValue('1')
+    expect((input.element as HTMLInputElement).value).toBe('1')
+  })
+
+  it('raises a below-minimum value to the floor on blur', async () => {
+    const wrapper = mount(AmountInput, { props: { modelValue: null, min: 10 } })
+    const input = wrapper.get('input')
+    await input.setValue('1')
+    await input.trigger('blur')
+    expect((input.element as HTMLInputElement).value).toBe('10')
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([10])
+  })
+
+  it('leaves an amount at or above the floor untouched on blur', async () => {
+    const wrapper = mount(AmountInput, { props: { modelValue: null, min: 10 } })
+    const input = wrapper.get('input')
+    await input.setValue('25')
+    await input.trigger('blur')
+    expect((input.element as HTMLInputElement).value).toBe('25')
+    expect(wrapper.emitted('update:modelValue')).toEqual([[25]])
+  })
+
+  it('does not clamp when no floor is configured', async () => {
+    const wrapper = mountInput()
+    const input = wrapper.get('input')
+    await input.setValue('1')
+    await input.trigger('blur')
+    expect((input.element as HTMLInputElement).value).toBe('1')
+  })
+
+  it('does not invent a floor for an empty field', async () => {
+    const wrapper = mount(AmountInput, { props: { modelValue: null, min: 10 } })
+    const input = wrapper.get('input')
+    await input.setValue('')
+    await input.trigger('blur')
+    expect((input.element as HTMLInputElement).value).toBe('')
+    expect(wrapper.emitted('update:modelValue')).toEqual([[null]])
+  })
+})

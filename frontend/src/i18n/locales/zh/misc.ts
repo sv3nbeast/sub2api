@@ -447,6 +447,8 @@ export default {
       USER_INACTIVE: '账号已被禁用',
       BALANCE_PAYMENT_DISABLED: '余额充值功能已关闭',
       INVALID_AMOUNT: '金额无效',
+      AMOUNT_BELOW_MIN: '低于最小充值金额，最低充值 {min}',
+      AMOUNT_ABOVE_MAX: '超出最大充值金额，最高充值 {max}',
       INVALID_INPUT: '参数有误',
       PLAN_NOT_AVAILABLE: '套餐不存在或已下架',
       GROUP_NOT_FOUND: '订阅分组不可用',

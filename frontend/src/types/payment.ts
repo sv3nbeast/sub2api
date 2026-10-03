@@ -69,6 +69,12 @@ export interface CheckoutInfoResponse {
   methods: Record<string, MethodLimit>
   global_min: number
   global_max: number
+  /** Admin-configured recharge floor (MIN_RECHARGE_AMOUNT); 0 = no minimum.
+   * Distinct from `global_min`, which is the union of per-method limits and
+   * collapses to 0 whenever any instance leaves its bound unset. */
+  min_amount: number
+  /** Admin-configured recharge ceiling (MAX_RECHARGE_AMOUNT); 0 = no maximum. */
+  max_amount: number
   plans: SubscriptionPlan[]
   balance_disabled: boolean
   balance_recharge_multiplier: number

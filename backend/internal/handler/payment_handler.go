@@ -158,6 +158,8 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		Methods:                   limitsResp.Methods,
 		GlobalMin:                 limitsResp.GlobalMin,
 		GlobalMax:                 limitsResp.GlobalMax,
+		MinAmount:                 cfg.MinAmount,
+		MaxAmount:                 cfg.MaxAmount,
 		Plans:                     planList,
 		BalanceDisabled:           cfg.BalanceDisabled,
 		BalanceRechargeMultiplier: cfg.BalanceRechargeMultiplier,
@@ -174,6 +176,13 @@ type checkoutInfoResponse struct {
 	Methods                   map[string]service.MethodLimits `json:"methods"`
 	GlobalMin                 float64                         `json:"global_min"`
 	GlobalMax                 float64                         `json:"global_max"`
+	// Admin-configured recharge bounds (MIN_RECHARGE_AMOUNT / MAX_RECHARGE_AMOUNT).
+	// GlobalMin/GlobalMax above are the union of per-instance limits, which
+	// widens to 0 whenever any instance leaves a bound unset and therefore
+	// cannot express this always-on constraint. The client needs both to
+	// validate before submitting.
+	MinAmount                 float64                         `json:"min_amount"`
+	MaxAmount                 float64                         `json:"max_amount"`
 	Plans                     []checkoutPlan                  `json:"plans"`
 	BalanceDisabled           bool                            `json:"balance_disabled"`
 	BalanceRechargeMultiplier float64                         `json:"balance_recharge_multiplier"`

@@ -2,23 +2,27 @@
   <div class="space-y-3.5">
     <!-- Quick Amount Buttons -->
     <div>
-      <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-        {{ t('payment.quickAmounts') }}
-      </label>
-      <div class="grid grid-cols-3 gap-2">
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <button
           v-for="amt in filteredAmounts"
           :key="amt"
           type="button"
           :class="[
-            'rounded-xl border px-3 py-2 text-center text-sm font-semibold transition-colors',
+            'rounded-xl border px-3 py-2.5 text-left transition-colors',
             modelValue === amt
-              ? 'border-primary-400 bg-primary-50 text-primary-700 shadow-sm dark:border-primary-500 dark:bg-primary-950/50 dark:text-primary-200'
-              : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-200 dark:hover:border-dark-500',
+              ? 'border-gray-900 bg-white ring-1 ring-gray-900 dark:border-white dark:bg-dark-800 dark:ring-white'
+              : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:hover:border-dark-500',
           ]"
           @click="selectAmount(amt)"
         >
-          {{ amt }}
+          <span class="block text-base font-bold tabular-nums text-gray-950 dark:text-white">
+            {{ formatQuickAmount(amt) }}
+          </span>
+          <!-- The credited figure is the number the user actually cares about; the
+               charged amount alone leaves them converting in their head. -->
+          <span v-if="creditRate > 0" class="mt-0.5 block text-xs tabular-nums text-gray-400 dark:text-dark-500">
+            {{ t('payment.creditedQuota', { amount: (amt * creditRate).toFixed(2) }) }}
+          </span>
         </button>
       </div>
     </div>
@@ -26,7 +30,7 @@
     <!-- Custom Amount Input -->
     <div>
       <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-        {{ t('payment.customAmount') }}
+        {{ t('payment.orCustomAmount') }}
       </label>
       <div class="relative">
         <!-- Bare glyph rather than a bordered chip: a boxed symbol inside a boxed
@@ -45,6 +49,9 @@
           @blur="commitAmount"
         />
       </div>
+      <p v-if="rangeHint" class="mt-1.5 text-right text-xs text-gray-400 dark:text-dark-500">
+        {{ rangeHint }}
+      </p>
     </div>
   </div>
 </template>
@@ -58,10 +65,16 @@ const props = withDefaults(defineProps<{
   modelValue: number | null
   min?: number
   max?: number
+  /** USD credited per unit of the displayed currency; 0 hides the credited line. */
+  creditRate?: number
+  /** Pre-formatted range caption shown under the custom input. */
+  rangeHint?: string
 }>(), {
-  amounts: () => [10, 20, 50, 100, 200, 500, 1000, 2000, 5000],
+  amounts: () => [10, 30, 50, 100],
   min: 0,
   max: 0,
+  creditRate: 0,
+  rangeHint: '',
 })
 
 const emit = defineEmits<{
@@ -92,6 +105,13 @@ const AMOUNT_PATTERN = /^\d*(\.\d{0,2})?$/
 function selectAmount(amt: number) {
   customText.value = String(amt)
   emit('update:modelValue', amt)
+}
+
+// Quick-amount tiles carry the ¥ prefix because the amount is charged in the
+// settlement currency, while the credited figure below them is always USD.
+function formatQuickAmount(amt: number): string {
+  const rounded = Number.isInteger(amt) ? String(amt) : amt.toFixed(2)
+  return `¥${rounded}`
 }
 
 function handleInput(e: Event) {

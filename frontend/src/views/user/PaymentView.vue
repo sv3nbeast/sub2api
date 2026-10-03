@@ -5,48 +5,50 @@
         <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
       </div>
       <template v-else>
-        <div class="relative overflow-hidden rounded-3xl border border-primary-100/80 bg-white p-4 shadow-card dark:border-primary-900/40 dark:bg-dark-900 sm:p-5">
-          <div class="pointer-events-none absolute inset-0 bg-mesh-gradient opacity-80 dark:opacity-40"></div>
-          <div class="pointer-events-none absolute -right-16 -top-24 h-52 w-52 rounded-full bg-primary-400/20 blur-3xl"></div>
-          <div class="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div class="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 dark:border-primary-800 dark:bg-primary-950/60 dark:text-primary-300">
-                <Icon name="shield" size="xs" />
-                {{ t('payment.secureCheckout') }}
-              </div>
-              <h1 class="mt-3 text-xl font-bold tracking-tight text-gray-950 dark:text-white sm:text-2xl">
-                {{ activeTab === 'subscription' ? t('payment.tabSubscribe') : t('payment.tabTopUp') }}
-              </h1>
-              <p class="mt-1.5 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-                {{ t('payment.subtitle') }}
-              </p>
-            </div>
-            <div class="grid grid-cols-3 gap-2 sm:min-w-[22rem]">
-              <div class="rounded-xl border border-white/70 bg-white/80 px-3 py-2 shadow-sm backdrop-blur dark:border-dark-700/70 dark:bg-dark-800/70">
-                <p class="text-[11px] font-medium text-gray-400 dark:text-gray-500">{{ t('payment.currentBalance') }}</p>
-                <p class="mt-0.5 truncate text-sm font-bold text-gray-950 dark:text-white">${{ user?.balance?.toFixed(2) || '0.00' }}</p>
-              </div>
-              <div class="rounded-xl border border-white/70 bg-white/80 px-3 py-2 shadow-sm backdrop-blur dark:border-dark-700/70 dark:bg-dark-800/70">
-                <p class="text-[11px] font-medium text-gray-400 dark:text-gray-500">{{ t('payment.activeSubscription') }}</p>
-                <p class="mt-0.5 text-sm font-bold text-gray-950 dark:text-white">{{ activeSubscriptions.length }}</p>
-              </div>
-              <div class="rounded-xl border border-white/70 bg-white/80 px-3 py-2 shadow-sm backdrop-blur dark:border-dark-700/70 dark:bg-dark-800/70">
-                <p class="text-[11px] font-medium text-gray-400 dark:text-gray-500">{{ t('payment.paymentMethod') }}</p>
-                <p class="mt-0.5 text-sm font-bold text-gray-950 dark:text-white">{{ enabledMethods.length }}</p>
-              </div>
-            </div>
+        <!-- Page heading and balance banner are separate blocks: the heading names
+             the page, the banner reports one figure and offers the actions that act
+             on it. Folding the actions into a decorated hero made the balance read
+             as a stat among several instead of the thing the buttons below operate
+             on. -->
+        <div>
+          <h1 class="text-xl font-bold tracking-tight text-gray-950 dark:text-white sm:text-2xl">
+            {{ t('payment.title') }}
+          </h1>
+          <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">
+            {{ t('payment.subtitle') }}
+          </p>
+        </div>
+
+        <div class="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-card dark:border-dark-700/50 dark:bg-dark-800/50 sm:flex-row sm:items-center sm:gap-4">
+          <div class="min-w-0 flex-1">
+            <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('payment.currentBalance') }}</p>
+            <p class="mt-0.5 truncate text-2xl font-bold tracking-tight text-gray-950 dark:text-white tabular-nums">
+              ${{ user?.balance?.toFixed(2) || '0.00' }}
+            </p>
           </div>
-          <div v-if="tabs.length > 1 && paymentPhase === 'select' && !selectedPlan" class="relative mt-4 inline-flex w-full rounded-xl border border-gray-200/70 bg-gray-50/90 p-1 dark:border-dark-700 dark:bg-dark-950/60 sm:w-auto">
+          <div class="flex flex-wrap gap-2">
+            <RouterLink v-if="!authStore.isSimpleMode" to="/redeem" class="btn btn-secondary inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold">
+              <Icon name="gift" size="xs" />
+              {{ t('payment.useRedeemCode') }}
+            </RouterLink>
+            <RouterLink to="/usage" class="btn btn-secondary inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold">
+              <Icon name="chartBar" size="xs" />
+              {{ t('payment.viewUsage') }}
+            </RouterLink>
             <button
-              v-for="tab in tabs"
-              :key="tab.key"
-              class="flex-1 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all sm:min-w-36"
-              :class="activeTab === tab.key ? 'bg-white text-gray-950 shadow-sm ring-1 ring-gray-200/70 dark:bg-dark-800 dark:text-white dark:ring-dark-700' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
-              @click="activeTab = tab.key"
+              v-if="canRecharge"
+              type="button"
+              class="btn btn-dark inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold"
+              @click="goToRecharge"
             >
-              {{ tab.label }}
+              <Icon name="plus" size="xs" />
+              {{ t('payment.rechargeNow') }}
             </button>
           </div>
+        </div>
+
+        <div v-if="tabs.length > 1 && paymentPhase === 'select' && !selectedPlan">
+          <PaymentTabSwitcher v-model="activeTab" :tabs="tabs" />
         </div>
 
         <div v-if="paymentBackendUnavailable" class="rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-amber-800 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
@@ -86,67 +88,124 @@
               <p class="text-gray-500 dark:text-gray-400">{{ t('payment.notAvailable') }}</p>
             </div>
             <template v-else>
-              <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+              <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
                 <div class="space-y-4">
-                  <!-- Account identity as a single caption line: it is context, not a
-                       figure worth a card of its own, and the balance it used to sit
-                       beside is already reported in the header. -->
-                  <p class="truncate text-xs text-gray-500 dark:text-gray-400">
-                    {{ t('payment.rechargeAccount') }}
-                    <span class="ml-1 font-semibold text-gray-700 dark:text-gray-200">{{ accountDisplayName }}</span>
-                  </p>
-                  <div class="card-glass p-4 sm:p-5">
+                  <div class="card p-4 sm:p-5">
+                    <div class="mb-3 flex items-baseline justify-between gap-3">
+                      <div>
+                        <p class="text-sm font-semibold text-gray-950 dark:text-white">{{ t('payment.rechargeTitle') }}</p>
+                        <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{{ t('payment.rechargeHint') }}</p>
+                      </div>
+                      <p class="shrink-0 truncate text-xs text-gray-400 dark:text-gray-500" :title="accountDisplayName">
+                        {{ t('payment.rechargeAccount') }}
+                        <span class="font-semibold text-gray-600 dark:text-gray-300">{{ accountDisplayName }}</span>
+                      </p>
+                    </div>
+                    <div class="mb-2.5 flex items-baseline justify-between gap-3">
+                      <span class="text-sm font-semibold text-gray-950 dark:text-white">{{ t('payment.quickAmounts') }}</span>
+                      <span class="shrink-0 text-xs text-gray-400 dark:text-gray-500">{{ creditedRateHint }}</span>
+                    </div>
                     <AmountInput
                       v-model="amount"
-                      :amounts="[10, 20, 50, 100, 200, 500, 1000, 2000, 5000]"
+                      :amounts="[10, 30, 50, 100]"
                       :min="globalMinAmount"
                       :max="globalMaxAmount"
+                      :credit-rate="balanceRechargeMultiplier"
+                      :range-hint="amountRangeHint"
                     />
                     <p v-if="amountError" class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">{{ amountError }}</p>
-                  </div>
-                  <div v-if="enabledMethods.length >= 1" class="card-glass p-4 sm:p-5">
+                    <div class="my-4 h-px bg-gray-100 dark:bg-dark-700"></div>
                     <PaymentMethodSelector
+                      v-if="enabledMethods.length >= 1"
+                      variant="row"
                       :methods="methodOptions"
                       :selected="selectedMethod"
                       @select="selectedMethod = $event"
                     />
+
+                    <!-- 结算区与选择区同卡：金额、汇率、按钮读起来才是一个对象。
+                         放在右侧独立卡里会让人以为「金额」和「选金额」是两件事。 -->
+                    <div class="my-4 h-px bg-gray-100 dark:bg-dark-700"></div>
+                    <div class="space-y-2.5 text-sm">
+                      <div v-if="feeRate > 0" class="flex justify-between">
+                        <span class="text-gray-500 dark:text-gray-400">{{ t('payment.fee') }} ({{ feeRate }}%)</span>
+                        <span class="font-semibold tabular-nums text-gray-950 dark:text-white">{{ formatSelectedPaymentAmount(feeAmount) }}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-gray-400">{{ t('payment.amountLabel') }}</span>
+                        <span class="font-semibold tabular-nums text-gray-950 dark:text-white">{{ formatSelectedPaymentAmount(totalAmount) }}</span>
+                      </div>
+                      <div v-if="usdtConvertedAmount" class="flex justify-between">
+                        <span class="text-gray-500 dark:text-gray-400">{{ t('payment.exchangeNote') }}</span>
+                        <span class="font-semibold tabular-nums text-gray-950 dark:text-white">≈ {{ usdtConvertedAmount }}</span>
+                      </div>
+                      <div class="flex items-baseline justify-between border-t border-gray-100 pt-2.5 dark:border-dark-700">
+                        <span class="font-semibold text-gray-950 dark:text-white">{{ t('payment.creditedQuotaLabel') }}</span>
+                        <span class="text-xl font-bold tabular-nums text-gray-950 dark:text-white">${{ creditedAmount.toFixed(2) }}</span>
+                      </div>
+                    </div>
+                    <button class="btn btn-dark mt-4 w-full py-2.5 text-sm font-semibold" :disabled="!canSubmit || submitting" @click="handleSubmitRecharge">
+                      <span v-if="submitting" class="flex items-center justify-center gap-2">
+                        <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                        {{ t('common.processing') }}
+                      </span>
+                      <span v-else>{{ t('payment.createOrder') }} {{ formatSelectedPaymentAmount(totalAmount) }}</span>
+                    </button>
+                    <p class="mt-2.5 text-center text-[11px] leading-5 text-gray-400 dark:text-dark-500">
+                      {{ t('payment.agreementPrefix') }} {{ t('payment.agreementTerms') }} · {{ t('payment.agreementRefund') }}
+                    </p>
                   </div>
                 </div>
                 <aside class="space-y-3 lg:sticky lg:top-6 lg:self-start">
-                  <!-- One settlement panel: amount, fee breakdown and the submit
-                       action share a container so the price and the button that
-                       charges it read as a single object. -->
-                  <div class="overflow-hidden rounded-2xl border border-primary-100 bg-white shadow-card dark:border-primary-900/40 dark:bg-dark-900">
-                    <div class="bg-gradient-to-br from-primary-500 to-cyan-600 px-5 py-4 text-white">
-                      <p class="text-xs font-medium text-white/75">{{ t('payment.actualPay') }}</p>
-                      <p class="mt-0.5 text-3xl font-black tracking-tight">{{ formatSelectedPaymentAmount(totalAmount) }}</p>
-                    </div>
-                    <div class="space-y-2.5 px-5 py-4 text-sm">
-                      <div v-if="feeRate > 0" class="flex justify-between">
-                        <span class="text-gray-500 dark:text-gray-400">{{ t('payment.fee') }} ({{ feeRate }}%)</span>
-                        <span class="font-semibold text-gray-950 dark:text-white">{{ formatSelectedPaymentAmount(feeAmount) }}</span>
-                      </div>
-                      <div v-if="balanceRechargeMultiplier !== 1" class="flex justify-between">
-                        <span class="text-gray-500 dark:text-gray-400">{{ t('payment.creditedBalance') }}</span>
-                        <span class="font-semibold text-gray-950 dark:text-white">${{ creditedAmount.toFixed(2) }}</span>
-                      </div>
-                      <p v-if="balanceRechargeMultiplier !== 1" class="rounded-lg bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500 dark:bg-dark-800 dark:text-gray-400">
-                        {{ t('payment.rechargeRatePreview', { currency: selectedCurrency, usd: balanceRechargeMultiplier.toFixed(2) }) }}
-                      </p>
-                      <button :class="['btn w-full py-2.5 text-sm font-semibold', paymentButtonClass]" :disabled="!canSubmit || submitting" @click="handleSubmitRecharge">
-                        <span v-if="submitting" class="flex items-center justify-center gap-2">
-                          <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-                          {{ t('common.processing') }}
-                        </span>
-                        <span v-else>{{ t('payment.createOrder') }} {{ formatSelectedPaymentAmount(totalAmount) }}</span>
-                      </button>
-                    </div>
-                  </div>
                   <div v-if="errorMessage" class="rounded-lg border border-red-200 bg-red-50 p-3.5 dark:border-red-800/50 dark:bg-red-900/20">
                     <p class="text-sm text-red-700 dark:text-red-400">{{ errorMessage }}</p>
                     <p v-if="errorHintMessage" class="mt-2 text-xs text-red-600 dark:text-red-300">{{ errorHintMessage }}</p>
                   </div>
+
+                  <div class="card p-4 sm:p-5">
+                    <p class="mb-1 text-sm font-semibold text-gray-950 dark:text-white">{{ t('payment.accountStatus') }}</p>
+                    <dl class="text-sm">
+                      <div class="flex items-center justify-between border-b border-gray-100 py-2.5 dark:border-dark-700">
+                        <dt class="text-gray-500 dark:text-gray-400">{{ t('payment.currentBalance') }}</dt>
+                        <dd class="font-semibold tabular-nums text-gray-950 dark:text-white">${{ user?.balance?.toFixed(2) || '0.00' }}</dd>
+                      </div>
+                      <div class="flex items-center justify-between border-b border-gray-100 py-2.5 dark:border-dark-700">
+                        <dt class="text-gray-500 dark:text-gray-400">{{ t('payment.activeSubscription') }}</dt>
+                        <dd class="font-semibold tabular-nums text-gray-950 dark:text-white">{{ activeSubscriptions.length }}</dd>
+                      </div>
+                      <div class="flex items-center justify-between border-b border-gray-100 py-2.5 dark:border-dark-700">
+                        <dt class="text-gray-500 dark:text-gray-400">{{ t('payment.concurrencyLimit') }}</dt>
+                        <dd class="font-semibold tabular-nums text-gray-950 dark:text-white">{{ user?.concurrency ?? '-' }}</dd>
+                      </div>
+                      <div class="flex items-center justify-between py-2.5">
+                        <dt class="text-gray-500 dark:text-gray-400">{{ t('payment.availableMethods') }}</dt>
+                        <dd class="font-semibold tabular-nums text-gray-950 dark:text-white">{{ enabledMethods.length }}</dd>
+                      </div>
+                    </dl>
+                  </div>
+
+                  <div class="card p-4 sm:p-5">
+                    <p class="mb-2.5 text-sm font-semibold text-gray-950 dark:text-white">{{ t('payment.billingRules') }}</p>
+                    <ul class="space-y-2 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                      <li class="flex gap-2"><span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-400"></span><span>{{ creditedRuleText }}</span></li>
+                      <li class="flex gap-2"><span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-400"></span><span>{{ t('payment.ruleToken') }}</span></li>
+                      <li class="flex gap-2"><span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-400"></span><span>{{ t('payment.rulePrecision') }}</span></li>
+                      <li class="flex gap-2"><span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-400"></span><span>{{ t('payment.ruleNoExpiry') }}</span></li>
+                      <li class="flex gap-2"><span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-400"></span><span>{{ t('payment.ruleRefund') }}</span></li>
+                    </ul>
+                  </div>
                 </aside>
+              </div>
+
+              <!-- 充值记录：独立于上方两栏，列宽较宽，放全宽 -->
+              <div class="card mt-4 overflow-hidden">
+                <div class="border-b border-gray-100 px-4 py-3 dark:border-dark-700 sm:px-5">
+                  <p class="text-sm font-semibold text-gray-950 dark:text-white">{{ t('payment.rechargeRecords') }}</p>
+                  <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{{ t('payment.recentBills') }}</p>
+                </div>
+                <div class="px-4 pb-4 sm:px-5 sm:pb-5">
+                  <OrderTable :orders="recentOrders" :loading="ordersLoading" variant="compact" />
+                </div>
               </div>
             </template>
           </template>
@@ -361,7 +420,7 @@ import { paymentAPI } from '@/api/payment'
 import { extractApiErrorMessage, extractI18nErrorMessage } from '@/utils/apiError'
 import { isMobileDevice } from '@/utils/device'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel, type PeakRateFields } from '@/utils/peak-rate'
-import type { SubscriptionPlan, CheckoutInfoResponse, CreateOrderResult, OrderType } from '@/types/payment'
+import type { SubscriptionPlan, CheckoutInfoResponse, CreateOrderResult, OrderType, PaymentOrder } from '@/types/payment'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import AmountInput from '@/components/payment/AmountInput.vue'
 import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector.vue'
@@ -379,6 +438,8 @@ import {
 } from '@/components/payment/paymentFlow'
 import { platformAccentBarClass, platformBadgeLightClass, platformBorderClass, platformTextClass, platformLabel } from '@/utils/platformColors'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
+import OrderTable from '@/components/payment/OrderTable.vue'
+import PaymentTabSwitcher, { type PaymentTab, type PaymentTabKey } from '@/components/payment/PaymentTabSwitcher.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatPaymentAmount, normalizePaymentCurrency } from '@/components/payment/currency'
@@ -396,7 +457,9 @@ const subscriptionStore = useSubscriptionStore()
 const appStore = useAppStore()
 
 const user = computed(() => authStore.user)
-const activeSubscriptions = computed(() => subscriptionStore.activeSubscriptions)
+// The sidebar shows the account name too, but the recharge form has to answer
+// "which account is being credited" on its own — a user on a shared machine should
+// not have to scan the sidebar to find out.
 const accountDisplayName = computed(() => {
   const username = user.value?.username?.trim()
   if (username) return username
@@ -404,6 +467,7 @@ const accountDisplayName = computed(() => {
   if (email) return email
   return user.value?.id ? `#${user.value.id}` : '-'
 })
+const activeSubscriptions = computed(() => subscriptionStore.activeSubscriptions)
 
 function getDaysRemaining(expiresAt: string): number {
   const diff = new Date(expiresAt).getTime() - Date.now()
@@ -422,11 +486,13 @@ const loading = ref(true)
 const submitting = ref(false)
 const errorMessage = ref('')
 const errorHintMessage = ref('')
-const activeTab = ref<'recharge' | 'subscription'>('recharge')
+const activeTab = ref<PaymentTabKey>('recharge')
 const amount = ref<number | null>(null)
 const selectedMethod = ref('')
 const selectedPlan = ref<SubscriptionPlan | null>(null)
 const previewImage = ref('')
+const recentOrders = ref<PaymentOrder[]>([])
+const ordersLoading = ref(false)
 const paymentBackendUnavailable = ref(false)
 
 const paymentPhase = ref<'select' | 'paying'>('select')
@@ -608,6 +674,7 @@ function createEmptyCheckoutInfo(): CheckoutInfoResponse {
     balance_disabled: false,
     balance_recharge_multiplier: 1,
     subscription_usd_to_cny_rate: 0,
+    usdt_to_cny_rate: 0,
     recharge_fee_rate: 0,
     help_text: '',
     help_image_url: '',
@@ -639,7 +706,7 @@ const renderedHelpText = computed(() => DOMPurify.sanitize(
 const subscriptionEnabled = computed(() => resolveFeatureFlag(appStore.cachedPublicSettings, FeatureFlags.subscription))
 
 const tabs = computed(() => {
-  const result: { key: 'recharge' | 'subscription'; label: string }[] = []
+  const result: PaymentTab[] = []
   if (!checkout.value.balance_disabled) result.push({ key: 'recharge', label: t('payment.tabTopUp') })
   if (subscriptionEnabled.value) result.push({ key: 'subscription', label: t('payment.tabSubscribe') })
   return result
@@ -654,6 +721,19 @@ watch(tabs, (available) => {
   if (leavingSubscription) selectedPlan.value = null
 })
 
+// The banner's recharge action is visible from both tabs, so it has to respect
+// the same availability as the recharge tab itself: with balance recharge
+// disabled it would otherwise open a form whose every submission is rejected.
+const canRecharge = computed(() => tabs.value.some((tab) => tab.key === 'recharge'))
+
+// Clearing the selected plan matters: the tab switcher is hidden while a plan
+// is being confirmed, so switching tabs underneath it would leave the user on
+// the recharge form with no visible way back to their subscription.
+function goToRecharge() {
+  selectedPlan.value = null
+  activeTab.value = 'recharge'
+}
+
 const visibleMethods = computed(() => getVisibleMethods(checkout.value.methods))
 const enabledMethods = computed(() => Object.keys(visibleMethods.value))
 const validAmount = computed(() => amount.value ?? 0)
@@ -662,6 +742,53 @@ const balanceRechargeMultiplier = computed(() => {
   return Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1
 })
 const creditedAmount = computed(() => Math.round((validAmount.value * balanceRechargeMultiplier.value) * 100) / 100)
+
+// USDT 参考折算。GMPay 以 USD/CNY 报价，USDT 与 USD 等价锚定，故直接相除。
+// 未配置汇率（0）时返回空串，该行不渲染 —— 宁可不显示，也不显示一个编造的汇率。
+const usdtToCnyRate = computed(() => {
+  const rate = Number(checkout.value.usdt_to_cny_rate)
+  return Number.isFinite(rate) && rate > 0 ? rate : 0
+})
+
+const isUsdtMethod = computed(() => selectedMethod.value.toLowerCase().includes('usdt'))
+
+const usdtConvertedAmount = computed(() => {
+  if (!isUsdtMethod.value || usdtToCnyRate.value <= 0 || totalAmount.value <= 0) return ''
+  return `${(totalAmount.value / usdtToCnyRate.value).toFixed(2)} USDT`
+})
+
+// Copy for the exchange rate. The multiplier is admin-configurable, so the caption
+// is derived rather than hardcoded — a hardcoded "¥1 = $1" would silently become a
+// false statement the moment the multiplier is changed.
+const creditedRateHint = computed(() => {
+  const rate = balanceRechargeMultiplier.value
+  return rate === 1
+    ? t('payment.creditedFrom')
+    : t('payment.creditedFromRate', { rate: rate.toFixed(2) })
+})
+
+// Same rate, stated as a billing rule. Kept as its own string so the rule list and
+// the amount caption can diverge in wording without one dragging the other.
+const creditedRuleText = computed(() => {
+  const rate = balanceRechargeMultiplier.value
+  return rate === 1
+    ? t('payment.ruleExchange')
+    : t('payment.ruleExchangeRate', { rate: rate.toFixed(2) })
+})
+
+// Range caption under the custom-amount input. Both bounds are optional, so each
+// is rendered only when configured instead of printing a meaningless 0.
+const amountRangeHint = computed(() => {
+  const min = globalMinAmount.value
+  const max = globalMaxAmount.value
+  if (min <= 0 && max <= 0) return ''
+  if (min > 0 && max > 0) {
+    return t('payment.rangeHint', { min: formatSelectedPaymentAmount(min), max: formatSelectedPaymentAmount(max) })
+  }
+  if (min > 0) return t('payment.rangeHint', { min: formatSelectedPaymentAmount(min), max: '—' })
+  return t('payment.rangeHint', { min: '—', max: formatSelectedPaymentAmount(max) })
+})
+
 
 // Adaptive grid: center single card, 2-col for 2 plans, 3-col for 3+
 const planGridClass = computed(() => {
@@ -941,6 +1068,20 @@ function selectPlanFromModal(plan: SubscriptionPlan) {
 function closeRenewalModal() {
   showRenewalModal.value = false
   renewGroupId.value = null
+}
+
+// 最近的充值记录。只取余额订单的前若干条用于进页面即见，完整列表在「我的订单」页。
+async function fetchRecentOrders() {
+  ordersLoading.value = true
+  try {
+    const res = await paymentAPI.getMyOrders({ page: 1, page_size: 5 })
+    recentOrders.value = (res.data.items || []).filter(o => o.order_type === 'balance')
+  } catch {
+    // 记录列表失败不影响充值主流程，静默降级为空表。
+    recentOrders.value = []
+  } finally {
+    ordersLoading.value = false
+  }
 }
 
 async function handleSubmitRecharge() {
@@ -1349,6 +1490,10 @@ onMounted(async () => {
   // Fetch active subscriptions (uses cache, non-blocking); skipped when the subscription feature is off
   if (subscriptionEnabled.value) {
     subscriptionStore.fetchActiveSubscriptions().catch(() => {})
+  }
+  // 记录列表与主流程互不依赖，拿到 checkout 之后再拉，失败也不影响充值。
+  if (!paymentBackendUnavailable.value) {
+    fetchRecentOrders().catch(() => {})
   }
 })
 </script>

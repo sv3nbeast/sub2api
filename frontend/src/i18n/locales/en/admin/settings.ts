@@ -730,6 +730,10 @@ export default {
         subscriptionUsdToCnyRateHint:
           'CNY charged per 1 USD of plan price on CNY channels (e.g. 7.15). 0 or empty = disabled, plan price is charged as-is. When enabled, all plan prices must be set in USD',
         subscriptionUsdToCnyRateDisabled: 'Disabled (price charged as-is)',
+        usdtToCnyRate: 'USDT Conversion Rate',
+        usdtToCnyRateHint:
+          'CNY per 1 USDT, used to show the "≈ X USDT" reference on the recharge page. GMPay quotes USD/CNY and USDT is pegged to USD. 0 or empty = row hidden',
+        usdtToCnyRateDisabled: 'Not configured (row hidden)',
         rechargeFeeRate: 'Recharge Fee Rate',
         rechargeFeeRateHint: 'Percentage of service fee charged on top of recharge amount, 0 means no fee',
         rechargeFeePreview: 'Preview: Recharge 100, fee {fee}',

@@ -5,6 +5,7 @@ import { PAYMENT_RECOVERY_STORAGE_KEY } from '@/components/payment/paymentFlow'
 import { formatPaymentAmount } from '@/components/payment/currency'
 import AmountInput from '@/components/payment/AmountInput.vue'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
+import PaymentTabSwitcher from '@/components/payment/PaymentTabSwitcher.vue'
 import en from '@/i18n/locales/en'
 import zh from '@/i18n/locales/zh'
 import type { CheckoutInfoResponse, MethodLimit, SubscriptionPlan } from '@/types/payment'
@@ -246,6 +247,7 @@ async function mountSubscriptionConfirm(options: Parameters<typeof checkoutInfoW
   const wrapper = shallowMount(PaymentView, {
     global: {
       stubs: {
+        RouterLink: { template: '<a><slot /></a>' },
         AppLayout: {
           template: '<div><slot /></div>',
         },
@@ -286,6 +288,7 @@ async function mountSubscriptionPlanList(planCount: number) {
   const wrapper = shallowMount(PaymentView, {
     global: {
       stubs: {
+        RouterLink: { template: '<a><slot /></a>' },
         AppLayout: {
           template: '<div><slot /></div>',
         },
@@ -313,6 +316,7 @@ describe('PaymentView help text', () => {
     const wrapper = shallowMount(PaymentView, {
       global: {
         stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
           AppLayout: { template: '<div><slot /></div>' },
           Teleport: true,
           Transition: false,
@@ -395,6 +399,7 @@ describe('PaymentView recharge rate preview', () => {
     const wrapper = shallowMount(PaymentView, {
       global: {
         stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
           AppLayout: { template: '<div><slot /></div>' },
           Teleport: true,
           Transition: false,
@@ -405,12 +410,12 @@ describe('PaymentView recharge rate preview', () => {
     wrapper.getComponent(AmountInput).vm.$emit('update:modelValue', 10)
     await flushPromises()
 
-    expect(translate).toHaveBeenCalledWith('payment.rechargeRatePreview', {
-      currency: 'USD',
-      usd: '0.50',
-    })
-    expect(en.payment.rechargeRatePreview).toBe('Current rate: 1 {currency} = {usd} USD')
-    expect(zh.payment.rechargeRatePreview).toBe('当前倍率：1 {currency} = {usd} USD')
+    // The rate caption now states the USD credit per unit of the site currency
+    // rather than echoing the site currency back at the user, so the multiplier
+    // appears once and the currency is fixed to USD (the balance denomination).
+    expect(translate).toHaveBeenCalledWith('payment.creditedFromRate', { rate: '0.50' })
+    expect(en.payment.creditedFromRate).toBe('At ¥1 = ${rate}')
+    expect(zh.payment.creditedFromRate).toBe('按 ¥1 = ${rate} 入账')
   })
 })
 
@@ -562,6 +567,7 @@ describe('PaymentView payment recovery', () => {
     const wrapper = shallowMount(PaymentView, {
       global: {
         stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
           AppLayout: {
             template: '<div><slot /></div>',
           },
@@ -623,6 +629,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     shallowMount(PaymentView, {
       global: {
         stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
           AppLayout: { template: '<div><slot /></div>' },
           Teleport: true,
           Transition: false,
@@ -651,6 +658,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     const wrapper = shallowMount(PaymentView, {
       global: {
         stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
           AppLayout: { template: '<div><slot /></div>' },
           Teleport: true,
           Transition: false,
@@ -672,6 +680,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     const wrapper = shallowMount(PaymentView, {
       global: {
         stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
           AppLayout: { template: '<div><slot /></div>' },
           Teleport: true,
           Transition: false,
@@ -692,6 +701,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     shallowMount(PaymentView, {
       global: {
         stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
           Teleport: true,
           Transition: false,
         },
@@ -713,6 +723,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     const wrapper = shallowMount(PaymentView, {
       global: {
         stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
           Teleport: true,
           Transition: false,
         },
@@ -757,6 +768,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     shallowMount(PaymentView, {
       global: {
         stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
           Teleport: true,
           Transition: false,
         },
@@ -795,6 +807,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     shallowMount(PaymentView, {
       global: {
         stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
           Teleport: true,
           Transition: false,
         },
@@ -843,6 +856,7 @@ describe('PaymentView WeChat JSAPI flow', () => {
     shallowMount(PaymentView, {
       global: {
         stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
           Teleport: true,
           Transition: false,
         },
@@ -872,11 +886,11 @@ describe('PaymentView subscription feature flag', () => {
     appStoreState.setPublicSettings(undefined)
   })
 
+  // The switcher is its own component (stubbed by shallowMount), so read the
+  // tabs the page hands it; an absent switcher means no tabs are offered.
   function tabLabels(wrapper: Awaited<ReturnType<typeof mountSubscriptionPlanList>>) {
-    return wrapper
-      .findAll('button')
-      .map((button) => button.text())
-      .filter((text) => text === 'payment.tabTopUp' || text === 'payment.tabSubscribe')
+    const switcher = wrapper.findComponent(PaymentTabSwitcher)
+    return switcher.exists() ? switcher.props('tabs').map((tab) => tab.label) : []
   }
 
   it('keeps the top-up / subscribe switcher when subscription_enabled is absent (opt-out default)', async () => {

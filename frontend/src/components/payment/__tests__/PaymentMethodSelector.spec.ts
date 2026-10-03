@@ -60,4 +60,33 @@ describe('PaymentMethodSelector', () => {
     expect(button.classes()).toContain('border-primary-500')
     expect(button.classes()).not.toContain('border-[#02A9F1]')
   })
+
+  // The recharge card uses the compact row layout. Its selection is a neutral
+  // emphasis, so even a genuine built-in method must not pick up a brand color
+  // there — while the default grid (subscription confirmation) keeps it.
+  it('uses a neutral selected style in the row variant, even for built-in methods', () => {
+    const wrapper = mount(PaymentMethodSelector, {
+      props: {
+        selected: 'alipay',
+        variant: 'row',
+        methods: [{ type: 'alipay', display_name: 'Alipay', fee_rate: 0, available: true }],
+      },
+    })
+
+    const button = wrapper.get('button')
+    expect(button.classes()).toEqual(expect.arrayContaining(['border-gray-900', 'ring-1']))
+    expect(button.classes()).not.toContain('border-[#02A9F1]')
+    expect(wrapper.get('[data-testid="payment-method-grid"]').classes()).not.toContain('lg:grid-cols-4')
+  })
+
+  it('keeps the brand selected style for built-in methods in the default grid', () => {
+    const wrapper = mount(PaymentMethodSelector, {
+      props: {
+        selected: 'alipay',
+        methods: [{ type: 'alipay', display_name: 'Alipay', fee_rate: 0, available: true }],
+      },
+    })
+
+    expect(wrapper.get('button').classes()).toContain('border-[#02A9F1]')
+  })
 })

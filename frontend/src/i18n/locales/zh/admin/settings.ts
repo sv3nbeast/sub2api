@@ -725,6 +725,10 @@ export default {
         subscriptionUsdToCnyRateHint:
           'CNY 支付通道下，套餐每 1 USD 价格收取多少 CNY（如 7.15）。0 或留空 = 不换算，订阅按 price 数值直接收款。启用后所有套餐 price 必须按 USD 定价',
         subscriptionUsdToCnyRateDisabled: '未启用（按 price 直付）',
+        usdtToCnyRate: 'USDT 折算汇率',
+        usdtToCnyRateHint:
+          '1 USDT 折合多少 CNY，用于充值页展示「按实时汇率折算 ≈ X USDT」的参考值。GMPay 以 USD/CNY 报价，USDT 与 USD 等价锚定。0 或留空 = 不展示该行',
+        usdtToCnyRateDisabled: '未配置（不展示折算行）',
         rechargeFeeRate: '充值手续费率',
         rechargeFeeRateHint: '用户充值时额外收取的手续费百分比，0 表示不收取手续费',
         rechargeFeePreview: '预览：充值 100 元，手续费 {fee} 元',

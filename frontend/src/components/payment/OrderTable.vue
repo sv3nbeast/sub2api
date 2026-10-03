@@ -32,6 +32,11 @@
     <template #cell-payment_type="{ value }">
       <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('payment.methods.' + value, value) }}</span>
     </template>
+    <template v-if="variant === 'compact'" #cell-credited_amount="{ row }">
+      <span class="text-sm font-medium text-gray-900 dark:text-white">
+        {{ creditedAmountSymbol }}{{ row.amount.toFixed(2) }}
+      </span>
+    </template>
     <template #cell-status="{ value }">
       <OrderStatusBadge :status="value" />
     </template>
@@ -59,9 +64,21 @@ const props = defineProps<{
   orders: PaymentOrder[]
   loading: boolean
   showUser?: boolean
+  /**
+   * 'full'（默认）为完整订单表，含订单 ID 与操作列；
+   * 'compact' 是充值页底部的「最近账单」摘要，只保留用户需要核对进账的列。
+   */
+  variant?: 'full' | 'compact'
 }>()
 
-function formatDate(dateStr: string) { return new Date(dateStr).toLocaleString() }
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr)
+  if (props.variant === 'compact') {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+  return d.toLocaleString()
+}
 
 const creditedAmountSymbol = currencySymbol('USD')
 
@@ -74,6 +91,16 @@ function isCreditGrantOrder(order: PaymentOrder): boolean {
 }
 
 const columns = computed((): Column[] => {
+  if (props.variant === 'compact') {
+    return [
+      { key: 'created_at', label: t('payment.orders.createdAt') },
+      { key: 'out_trade_no', label: t('payment.orders.orderNo') },
+      { key: 'payment_type', label: t('payment.orders.paymentMethod') },
+      { key: 'pay_amount', label: t('payment.orders.payAmount') },
+      { key: 'credited_amount', label: t('payment.creditedQuotaLabel') },
+      { key: 'status', label: t('payment.orders.status') },
+    ]
+  }
   const cols: Column[] = [
     { key: 'id', label: t('payment.orders.orderId') },
     { key: 'out_trade_no', label: t('payment.orders.orderNo') },

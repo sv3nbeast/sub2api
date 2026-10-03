@@ -98,6 +98,14 @@
     @apply hover:border-gray-300 dark:hover:border-dark-500;
   }
 
+  /* 中性深色主按钮：用于「支付/充值」这类唯一的推进动作。
+     与 btn-primary 的区别是不带品牌渐变，避免和支付方式的品牌色打架。 */
+  .btn-dark {
+    @apply bg-gray-950 dark:bg-white;
+    @apply text-white dark:text-gray-950;
+    @apply shadow-sm hover:bg-gray-800 dark:hover:bg-gray-100;
+  }
+
   .btn-ghost {
     @apply bg-transparent text-gray-600 dark:text-gray-300;
     @apply hover:bg-gray-100 dark:hover:bg-dark-800;

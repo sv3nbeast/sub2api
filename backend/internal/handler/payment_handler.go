@@ -164,6 +164,7 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		BalanceDisabled:           cfg.BalanceDisabled,
 		BalanceRechargeMultiplier: cfg.BalanceRechargeMultiplier,
 		SubscriptionUSDToCNYRate:  cfg.SubscriptionUSDToCNYRate,
+		USDTToCNYRate:             cfg.USDTToCNYRate,
 		RechargeFeeRate:           cfg.RechargeFeeRate,
 		HelpText:                  cfg.HelpText,
 		HelpImageURL:              cfg.HelpImageURL,
@@ -173,25 +174,28 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 }
 
 type checkoutInfoResponse struct {
-	Methods                   map[string]service.MethodLimits `json:"methods"`
-	GlobalMin                 float64                         `json:"global_min"`
-	GlobalMax                 float64                         `json:"global_max"`
+	Methods   map[string]service.MethodLimits `json:"methods"`
+	GlobalMin float64                         `json:"global_min"`
+	GlobalMax float64                         `json:"global_max"`
 	// Admin-configured recharge bounds (MIN_RECHARGE_AMOUNT / MAX_RECHARGE_AMOUNT).
 	// GlobalMin/GlobalMax above are the union of per-instance limits, which
 	// widens to 0 whenever any instance leaves a bound unset and therefore
 	// cannot express this always-on constraint. The client needs both to
 	// validate before submitting.
-	MinAmount                 float64                         `json:"min_amount"`
-	MaxAmount                 float64                         `json:"max_amount"`
-	Plans                     []checkoutPlan                  `json:"plans"`
-	BalanceDisabled           bool                            `json:"balance_disabled"`
-	BalanceRechargeMultiplier float64                         `json:"balance_recharge_multiplier"`
-	SubscriptionUSDToCNYRate  float64                         `json:"subscription_usd_to_cny_rate"`
-	RechargeFeeRate           float64                         `json:"recharge_fee_rate"`
-	HelpText                  string                          `json:"help_text"`
-	HelpImageURL              string                          `json:"help_image_url"`
-	StripePublishableKey      string                          `json:"stripe_publishable_key"`
-	AlipayForceQRCode         bool                            `json:"alipay_force_qrcode"`
+	MinAmount                 float64        `json:"min_amount"`
+	MaxAmount                 float64        `json:"max_amount"`
+	Plans                     []checkoutPlan `json:"plans"`
+	BalanceDisabled           bool           `json:"balance_disabled"`
+	BalanceRechargeMultiplier float64        `json:"balance_recharge_multiplier"`
+	SubscriptionUSDToCNYRate  float64        `json:"subscription_usd_to_cny_rate"`
+	// USDTToCNYRate 为 0 时不展示 USDT 折算行。用户下单前看到的
+	// 「按实时汇率折算 ≈ X USDT」就是这个值的倒数。
+	USDTToCNYRate        float64 `json:"usdt_to_cny_rate"`
+	RechargeFeeRate      float64 `json:"recharge_fee_rate"`
+	HelpText             string  `json:"help_text"`
+	HelpImageURL         string  `json:"help_image_url"`
+	StripePublishableKey string  `json:"stripe_publishable_key"`
+	AlipayForceQRCode    bool    `json:"alipay_force_qrcode"`
 }
 
 type checkoutPlan struct {

@@ -1,11 +1,11 @@
 <template>
   <div>
-    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+    <label :class="styles.label">
       {{ t('payment.paymentMethod') }}
     </label>
     <div
       data-testid="payment-method-grid"
-      class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
+      :class="styles.grid"
     >
       <button
         v-for="method in sortedMethods"
@@ -13,25 +13,18 @@
         type="button"
         :title="methodLabel(method)"
         :disabled="!method.available"
-        :class="[
-          'relative flex h-[60px] min-w-0 flex-col items-center justify-center rounded-lg border px-3 transition-all',
-          !method.available
-            ? 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-50 dark:border-dark-700 dark:bg-dark-800/50'
-            : selected === method.type
-              ? methodSelectedClass(method.type)
-              : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-200 dark:hover:border-dark-500',
-        ]"
+        :class="[styles.button, stateClass(method)]"
         @click="method.available && emit('select', method.type)"
       >
-        <span class="flex w-full min-w-0 items-center justify-center gap-2">
-          <img :src="methodIcon(method.type)" :alt="methodLabel(method)" class="h-7 w-7 shrink-0 object-contain" />
-          <span class="flex min-w-0 flex-col items-start leading-none">
-            <span data-testid="payment-method-label" class="block w-full truncate text-base font-semibold">
+        <span :class="styles.inner">
+          <img :src="methodIcon(method.type)" :alt="methodLabel(method)" :class="styles.icon" />
+          <span :class="styles.text">
+            <span data-testid="payment-method-label" :class="styles.name">
               {{ methodLabel(method) }}
             </span>
             <span
               v-if="method.fee_rate > 0"
-              class="text-[10px] tracking-wide text-gray-500 dark:text-dark-400"
+              :class="styles.fee"
             >
               {{ t('payment.fee') }} {{ method.fee_rate }}%
             </span>
@@ -60,16 +53,56 @@ export interface PaymentMethodOption {
   available: boolean
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   methods: PaymentMethodOption[]
   selected: string
-}>()
+  /**
+   * 'grid' (default) is the tile grid used on the subscription confirmation.
+   * 'row' is the compact, left-aligned row inside the recharge card. There the
+   * selection is a neutral emphasis rather than each provider's brand color:
+   * the card already ends in a dark primary action, and a second saturated
+   * color next to it made the selected method read as the thing to click.
+   */
+  variant?: 'grid' | 'row'
+}>(), {
+  variant: 'grid',
+})
 
 const emit = defineEmits<{
   select: [type: string]
 }>()
 
 const { t } = useI18n()
+
+const VARIANT_STYLES = {
+  grid: {
+    label: 'mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300',
+    grid: 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4',
+    button: 'relative flex h-[60px] min-w-0 flex-col items-center justify-center rounded-lg border px-3 transition-all',
+    inner: 'flex w-full min-w-0 items-center justify-center gap-2',
+    icon: 'h-7 w-7 shrink-0 object-contain',
+    text: 'flex min-w-0 flex-col items-start leading-none',
+    name: 'block w-full truncate text-base font-semibold',
+    fee: 'text-[10px] tracking-wide text-gray-500 dark:text-dark-400',
+    idle: 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-200 dark:hover:border-dark-500',
+  },
+  row: {
+    label: 'mb-2.5 block text-sm font-semibold text-gray-950 dark:text-white',
+    grid: 'grid grid-cols-2 gap-2.5 sm:grid-cols-3',
+    button: 'relative flex min-w-0 items-center rounded-xl border px-3.5 py-3 text-left transition-colors',
+    inner: 'flex w-full min-w-0 items-center gap-2.5',
+    icon: 'h-6 w-6 shrink-0 object-contain',
+    text: 'flex min-w-0 flex-col items-start leading-tight',
+    name: 'block w-full truncate text-sm font-semibold text-gray-950 dark:text-white',
+    fee: 'text-[10px] text-gray-400 dark:text-dark-500',
+    idle: 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:hover:border-dark-500',
+  },
+} as const
+
+const ROW_SELECTED_CLASS = 'border-gray-900 bg-white ring-1 ring-gray-900 dark:border-white dark:bg-dark-800 dark:ring-white'
+const DISABLED_CLASS = 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-50 dark:border-dark-700 dark:bg-dark-800/50'
+
+const styles = computed(() => VARIANT_STYLES[props.variant])
 
 const METHOD_ICONS: Record<string, string> = {
   alipay: alipayIcon,
@@ -101,6 +134,12 @@ function methodIcon(type: string): string {
 
 function methodLabel(method: PaymentMethodOption): string {
   return method.display_name || t(`payment.methods.${method.type}`, method.type)
+}
+
+function stateClass(method: PaymentMethodOption): string {
+  if (!method.available) return DISABLED_CLASS
+  if (props.selected !== method.type) return styles.value.idle
+  return props.variant === 'row' ? ROW_SELECTED_CLASS : methodSelectedClass(method.type)
 }
 
 function methodSelectedClass(type: string): string {

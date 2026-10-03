@@ -1,20 +1,20 @@
 <template>
-  <div class="space-y-4">
+  <div class="space-y-3.5">
     <!-- Quick Amount Buttons -->
     <div>
       <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
         {{ t('payment.quickAmounts') }}
       </label>
-      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div class="grid grid-cols-3 gap-2">
         <button
           v-for="amt in filteredAmounts"
           :key="amt"
           type="button"
           :class="[
-            'rounded-2xl border px-4 py-3 text-center font-semibold transition-all',
+            'rounded-xl border px-3 py-2 text-center text-sm font-semibold transition-colors',
             modelValue === amt
-              ? 'border-primary-400 bg-primary-50 text-primary-700 shadow-sm ring-2 ring-primary-500/10 dark:border-primary-500 dark:bg-primary-950/50 dark:text-primary-200'
-              : 'border-gray-200 bg-white text-gray-700 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-sm dark:border-dark-600 dark:bg-dark-800 dark:text-gray-200 dark:hover:border-dark-500',
+              ? 'border-primary-400 bg-primary-50 text-primary-700 shadow-sm dark:border-primary-500 dark:bg-primary-950/50 dark:text-primary-200'
+              : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-200 dark:hover:border-dark-500',
           ]"
           @click="selectAmount(amt)"
         >
@@ -29,7 +29,10 @@
         {{ t('payment.customAmount') }}
       </label>
       <div class="relative">
-        <span class="absolute left-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg bg-gray-100 text-sm font-semibold text-gray-500 dark:bg-dark-700 dark:text-dark-300">
+        <!-- Bare glyph rather than a bordered chip: a boxed symbol inside a boxed
+             field reads as two competing containers and never sits on the text
+             baseline. -->
+        <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-base font-semibold text-gray-400 dark:text-dark-400">
           $
         </span>
         <input
@@ -37,7 +40,7 @@
           inputmode="decimal"
           :value="customText"
           :placeholder="placeholderText"
-          class="input w-full py-3 pl-12 pr-4 text-base font-semibold"
+          class="input w-full py-2.5 pl-9 pr-4 text-base font-semibold"
           @input="handleInput"
           @blur="commitAmount"
         />

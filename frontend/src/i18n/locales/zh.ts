@@ -272,6 +272,22 @@ const baseMessages = {
   },
 
   docsGuide: {
+    sources: {
+      "claudeInstall": "Claude Code 官方安装步骤",
+      "codexInstall": "Codex 官方安装步骤",
+      "claudeGateway": "Claude 官方网关配置说明",
+      "codexConfig": "Codex 官方配置参考"
+    },
+    controls: {
+      "operatingSystem": "命令与配置适用系统",
+      "osHint": "选择后，请求命令、环境检查和配置路径会一起切换。WSL 请选 macOS / Linux；Windows 示例使用 PowerShell。",
+      "protocol": "请求协议",
+      "model": "模型 ID",
+      "copyBaseUrl": "复制基础地址",
+      "copySnippet": "复制 {label} 配置",
+      "lightMode": "切换浅色模式",
+      "darkMode": "切换深色模式"
+    },
     nav: {
       home: '首页',
       status: '服务状态'
@@ -332,7 +348,8 @@ const baseMessages = {
     examples: {
       eyebrow: '调用示例',
       title: '核心接口与首次请求',
-      description: 'Claude 客户端使用 Anthropic Messages；Codex 使用 OpenAI Responses。模型是否可用仍由 API Key 所属分组决定。'
+      description: 'Claude 客户端使用 Anthropic Messages；Codex 使用 OpenAI Responses；兼容聊天客户端使用 Chat Completions。先选择与客户端一致的协议。',
+      note: "替换 sk-your-key，并把模型 ID 改为该 Key 分组实际支持的模型。示例默认值来自站点推荐设置，不代表每个分组都可调用。以下为非流式最小验证请求；流式接入还需验证结束事件。"
     },
     sections: {
       models: {
@@ -356,7 +373,7 @@ const baseMessages = {
             description: '一个 Key 绑定一个分组。分组选错时，即使模型名称正确，也会返回“Requested model is not supported by this API key/group”。',
             items: [
               'Claude 客户端选择支持 Anthropic 请求的分组',
-              'Codex 选择包含目标 GPT 模型的 ChatGPT 分组',
+              'Codex 选择支持 Responses 且包含目标模型的分组',
               '不同客户端或环境使用独立 Key',
               '切换分组后重新打开客户端并验证'
             ],
@@ -371,25 +388,25 @@ const baseMessages = {
               '客户端的标题、压缩等辅助请求也会单独记账',
               '为自动化 Key 设置额度与时间窗口限制'
             ],
-            note: '公告只负责通知；真正影响计费的是分组和渠道定价配置。'
+            note: '分组倍率与模型报价以发起请求时的配置为准，已产生的用量记录可用于核对账单。'
           }
         }
       },
       cli: {
         eyebrow: 'CLI 工具',
         title: 'Claude Code 与 Codex 配置',
-        description: '以下配置与控制台“使用密钥”生成器保持一致，并按当前公共设置自动带入 Base URL、推荐模型和 WebSocket 能力。',
+        description: '以下展示通用配置，地址和推荐模型来自当前站点设置。分组专用模板、模型目录及 WebSocket 配置请优先从控制台“使用密钥”复制。将示例与已有配置合并，保留原有设置。',
         articles: {
           env: {
             title: '环境检查（通用步骤）',
-            description: '先确认 Node.js、npm 和 SubAPIs 健康检查可用，再安装或启动 Claude Code、Codex。已有环境变量可能覆盖配置文件。',
+            description: '先用 GET 健康检查确认终端能够访问网关，再按官方步骤安装客户端。Claude Code 原生安装不要求 Node.js；使用 npm 安装的客户端才需要 Node.js 和 npm。',
             items: [
-              'node 和 npm 命令必须能正常输出版本',
+              '安装完成后用 claude --version 或 codex --version 检查',
               '浏览器可用不等于终端网络一定可用',
               '检查 Key 是否包含空格、引号或换行',
               '已有 ANTHROPIC_* / OPENAI_* 变量可能覆盖文件'
             ],
-            note: '健康检查失败时先处理网络或域名；健康检查成功但模型请求失败，再检查 Key、余额、分组和模型名。'
+            note: '正常返回 status 为 ok 只说明网关可达，尚未验证 Key、模型或上游。不要用 curl -I：本站 /health 提供 GET，HEAD 会返回 404。'
           },
           claude: {
             title: 'Claude Code 配置',
@@ -397,21 +414,32 @@ const baseMessages = {
             items: [
               '创建支持 Anthropic 请求的分组 Key',
               '在 Key 列表点击“使用密钥”并选择 Claude Code',
-              '将生成内容写入对应系统的 settings.json',
+              '新建用户目录下的 .claude 文件夹，将 env 字段合并进 settings.json',
               '重启终端，运行 claude 后用 /model 核对模型'
             ],
-            note: '不要把 ANTHROPIC_BASE_URL 写成 /v1/messages，也不要用官方登录来验证第三方网关；配置完成后以实际对话能否完整返回为准。'
+            note: '将 sk-your-key 换成实际密钥。Windows 路径可粘贴到资源管理器地址栏；WSL 读取 Linux 用户目录。不要追加 /v1/messages，模型请用 /model 选择分组支持的完整 ID。'
+          },
+          vscode: {
+            "title": "VS Code · Claude Code 扩展",
+            "description": "扩展会先在 VS Code 用户设置中检查网关凭证。只修改 ~/.claude/settings.json 可能仍显示登录选择界面。",
+            "items": [
+              "安装 Anthropic 官方 Claude Code 扩展",
+              "打开命令面板，执行 Preferences: Open User Settings (JSON)",
+              "将下面的 claudeCode.environmentVariables 合并到用户设置，并替换密钥",
+              "执行 Developer: Reload Window，打开 Claude Code 新建会话验证"
+            ],
+            "note": "使用用户设置，不要将密钥写进项目的 .vscode/settings.json。Remote / WSL 窗口需检查扩展实际运行环境对应的设置。"
           },
           codex: {
             title: 'Codex CLI 配置',
             description: 'Codex 需要 config.toml 和 auth.json 两个文件。Provider 使用 /v1，并固定通过 Responses 协议调用。',
             items: [
-              '创建包含目标 GPT 模型的 ChatGPT 分组 Key',
+              '创建支持 Responses 且包含目标模型的分组 Key',
               '在 Key 列表选择 Codex CLI 或 WebSocket 配置',
               '分别保存 config.toml 与 auth.json',
               '运行 codex，用 /status 与 /model 检查当前配置'
             ],
-            note: 'wire_api 必须是 responses。若客户端仍请求官方地址，检查系统 OPENAI_BASE_URL、旧 Provider 或 IDE 插件配置是否覆盖了 config.toml。'
+            note: '将 sk-your-key 换成实际密钥，model 和 review_model 均需有分组权限。默认配置使用 HTTP / SSE；需要 WebSocket 时从“使用密钥”选择对应模板。设置了 CODEX_HOME 或凭证 keyring 的客户端，应核对实际配置与凭证目录。'
           },
           ccSwitch: {
             title: '导入 CC-Switch',
@@ -429,18 +457,19 @@ const baseMessages = {
       advanced: {
         eyebrow: '桌面客户端',
         title: 'Claude Desktop 与配置切换',
-        description: '保留当前已实际使用的桌面端接入方式，省略尚未提供模板或没有稳定验证的第三方客户端。',
+        description: '根据使用的客户端选择入口。Claude Desktop 的网关设置与 CLI 分开保存；CC-Switch 可以导入控制台生成的配置。',
         articles: {
           desktop: {
             title: 'Claude Desktop 第三方网关',
-            description: '在 Claude Desktop 开发者菜单的 Configure third-party inference 中填写 SubAPIs 网关信息。',
+            description: '用于桌面应用内的本地 Claude Code 会话；它读取独立的第三方推理配置，不读取 CLI 的 ANTHROPIC_BASE_URL 或 settings.json。',
             items: [
-              '开启 Developer Mode 并进入第三方推理配置',
+              '从 Help → Troubleshooting → Enable Developer Mode 开启并重启应用',
+              '进入 Developer → Configure Third-Party Inference，选择 Gateway',
               'Auth scheme 选择 x-api-key',
               '开启 Skip login-mode chooser',
               '点击 Apply locally 后直接新建会话验证'
             ],
-            note: '第三方网关模式不需要通过 Anthropic 官方账号登录测试。页面没有“测试成功”提示并不代表配置失败，以发送消息后的真实响应为准。'
+            note: '模型 ID 必须与分组支持列表一致。此模式运行本地会话，不能据此承诺网页版 Chat、远程会话或 Remote Control 可用；组织下发的配置可能覆盖本地设置。'
           }
         }
       },

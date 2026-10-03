@@ -280,6 +280,22 @@ const baseMessages = {
   },
 
   docsGuide: {
+    sources: {
+      "claudeInstall": "Official Claude Code installation",
+      "codexInstall": "Official Codex installation",
+      "claudeGateway": "Official Claude gateway setup",
+      "codexConfig": "Official Codex configuration reference"
+    },
+    controls: {
+      "operatingSystem": "Command and configuration platform",
+      "osHint": "Switches request commands, health checks, and file paths together. Choose macOS / Linux for WSL. Windows examples use PowerShell.",
+      "protocol": "Request protocol",
+      "model": "Model ID",
+      "copyBaseUrl": "Copy base URL",
+      "copySnippet": "Copy {label} configuration",
+      "lightMode": "Switch to light mode",
+      "darkMode": "Switch to dark mode"
+    },
     nav: {
       home: 'Home',
       status: 'Status'
@@ -342,7 +358,8 @@ const baseMessages = {
     examples: {
       eyebrow: 'Examples',
       title: 'Core endpoints and first request',
-      description: 'Claude clients use Anthropic Messages; Codex uses OpenAI Responses. The API key group still decides whether a model is available.'
+      description: 'Claude clients use Anthropic Messages, Codex uses OpenAI Responses, and compatible chat clients use Chat Completions. Select the protocol used by your client.',
+      note: "Replace sk-your-key and choose a model supported by that key group. Defaults come from site recommendations, which do not grant access in every group. These are minimal non-streaming checks; validate completion events separately when using streams."
     },
     sections: {
       models: {
@@ -366,7 +383,7 @@ const baseMessages = {
             description: 'One key belongs to one group. A correct model name still fails with “Requested model is not supported by this API key/group” when the group is wrong.',
             items: [
               'Claude clients need a group that accepts Anthropic requests',
-              'Codex needs a ChatGPT group containing the selected GPT model',
+              'Codex needs a group supporting Responses and the selected model',
               'Use a separate key per client or environment',
               'Restart and revalidate after changing a group'
             ],
@@ -381,7 +398,7 @@ const baseMessages = {
               'Client title or compaction calls may appear separately',
               'Set total and rolling-window limits for automation keys'
             ],
-            note: 'An announcement only informs users; billing changes only when group or channel pricing configuration changes.'
+            note: 'Rates and model prices are applied at request time. Use the recorded usage to verify your bill.'
           }
         }
       },
@@ -389,19 +406,19 @@ const baseMessages = {
         eyebrow: 'CLI Tools',
         title: 'Claude Code and Codex setup',
         description:
-          'These examples match the Use Key generator and automatically use the current public Base URL, recommended models, and WebSocket capability.',
+          'These are general examples using the current site URL and recommended models. Prefer Use Key for group templates, model catalogs, and WebSocket configuration. Merge examples into existing files and preserve your other settings.',
         articles: {
           env: {
             title: 'Environment check',
             description:
-              'Verify Node.js, npm, and the SubAPIs health endpoint before starting Claude Code or Codex. Existing environment variables may override config files.',
+              'Check gateway access with a GET health request, then follow the official client installation steps. Native Claude Code does not require Node.js; npm installations require Node.js and npm.',
             items: [
-              'node and npm must print valid versions',
+              'Check installation with claude --version or codex --version',
               'Browser access does not prove terminal network access',
               'Check the key for spaces, quotes, or line breaks',
               'Existing ANTHROPIC_* or OPENAI_* variables may override files'
             ],
-            note: 'If health checks fail, fix the network or domain first. If health works but generation fails, check the key, balance, group, and model ID.'
+            note: 'A status of ok only verifies gateway reachability, not credentials, models, or upstream access. Do not use curl -I: /health supports GET, while HEAD returns 404.'
           },
           claude: {
             title: 'Claude Code configuration',
@@ -410,21 +427,32 @@ const baseMessages = {
             items: [
               'Create a key in a group that accepts Anthropic requests',
               'Click Use Key and choose Claude Code',
-              'Write the generated content to settings.json',
+              'Create .claude in your user directory and merge env into settings.json',
               'Restart the terminal, run claude, and verify with /model'
             ],
-            note: 'Do not append /v1/messages to ANTHROPIC_BASE_URL or validate a third-party gateway with official login. Validate by sending a real message and receiving a complete response.'
+            note: 'Replace sk-your-key. Paste Windows paths into File Explorer; WSL uses the Linux user directory. Do not append /v1/messages. Use /model to select an exact model ID supported by your group.'
+          },
+          vscode: {
+            "title": "VS Code · Claude Code extension",
+            "description": "The extension checks gateway credentials in VS Code user settings before launch. Editing only ~/.claude/settings.json may still leave you at the login chooser.",
+            "items": [
+              "Install the official Anthropic Claude Code extension",
+              "Run Preferences: Open User Settings (JSON) in the command palette",
+              "Merge claudeCode.environmentVariables below into user settings and replace the key",
+              "Run Developer: Reload Window and test a new Claude Code conversation"
+            ],
+            "note": "Use user settings, not a committed project .vscode/settings.json. For Remote / WSL windows, check settings for the environment where the extension actually runs."
           },
           codex: {
             title: 'Codex CLI setup',
             description: 'Codex needs config.toml and auth.json. Its provider uses /v1 and the Responses wire protocol.',
             items: [
-              'Create a ChatGPT group key containing the target GPT model',
+              'Create a group key supporting Responses and the target model',
               'Choose Codex CLI or WebSocket under Use Key',
               'Save config.toml and auth.json separately',
               'Run codex, then inspect /status and /model'
             ],
-            note: 'wire_api must be responses. If Codex still contacts the official endpoint, check OPENAI_BASE_URL, stale providers, or IDE plugin settings overriding config.toml.'
+            note: 'Replace sk-your-key and verify group access for both model and review_model. The default uses HTTP / SSE; choose the WebSocket template under Use Key when needed. Check the actual configuration and credential location if CODEX_HOME or keyring storage is configured.'
           },
           ccSwitch: {
             title: 'Import into CC-Switch',
@@ -443,19 +471,20 @@ const baseMessages = {
       advanced: {
         eyebrow: 'Desktop Clients',
         title: 'Claude Desktop and configuration switching',
-        description: 'This section keeps only desktop workflows currently validated by SubAPIs and omits third-party clients without a supported template.',
+        description: 'Choose the setup for your client. Claude Desktop stores gateway settings separately from the CLI; CC-Switch can import configurations generated by the console.',
         articles: {
           desktop: {
             title: 'Claude Desktop third-party gateway',
             description:
-              'Enter the SubAPIs gateway in Configure third-party inference under the Claude Desktop developer menu.',
+              'For local Claude Code sessions in the desktop app. It reads its own third-party inference configuration, not the CLI ANTHROPIC_BASE_URL or settings.json.',
             items: [
-              'Enable Developer Mode and open third-party inference',
+              'Open Help → Troubleshooting → Enable Developer Mode and restart',
+              'Open Developer → Configure Third-Party Inference and select Gateway',
               'Select x-api-key as the auth scheme',
               'Enable Skip login-mode chooser',
               'Apply locally and validate in a new conversation'
             ],
-            note: 'Third-party gateway mode does not use Anthropic official account validation. The absence of a connection-success message is normal; validate with a real conversation.'
+            note: 'Model IDs must match the group list. This mode runs local sessions, not web Chat, remote sessions, or Remote Control. Organization-distributed configuration may override local settings.'
           }
         }
       },

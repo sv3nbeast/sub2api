@@ -337,7 +337,7 @@ const baseMessages = {
       environment: {
         title: '复制客户端配置',
         description: '在 API Key 列表点击“使用密钥”，选择 Claude Code、Codex CLI 或 WebSocket 配置。平台会带入当前 Base URL 和推荐模型。',
-        items: ['优先复制平台生成的配置', 'Claude Base URL 不追加 /v1', 'Codex Provider Base URL 使用 /v1', '修改已有文件前先保留备份']
+        items: ['优先复制平台生成的配置', '客户端 Base URL 使用本站基础地址', '本项目 Codex 也支持直接使用根地址', '修改已有文件前先保留备份']
       },
       firstCall: {
         title: '发起首次请求',
@@ -348,6 +348,7 @@ const baseMessages = {
     examples: {
       eyebrow: '调用示例',
       title: '核心接口与首次请求',
+      addressHint: '客户端 Base URL 填 {baseUrl}。下表和请求命令展示的是完整请求地址（基础地址 + 接口路径），不要将 /v1/messages 或 /v1/responses 整段填进 Base URL。',
       description: 'Claude 客户端使用 Anthropic Messages；Codex 使用 OpenAI Responses；兼容聊天客户端使用 Chat Completions。先选择与客户端一致的协议。',
       note: "替换 sk-your-key，并把模型 ID 改为该 Key 分组实际支持的模型。示例默认值来自站点推荐设置，不代表每个分组都可调用。以下为非流式最小验证请求；流式接入还需验证结束事件。"
     },
@@ -432,7 +433,7 @@ const baseMessages = {
           },
           codex: {
             title: 'Codex CLI 配置',
-            description: 'Codex 需要 config.toml 和 auth.json 两个文件。Provider 使用 /v1，并固定通过 Responses 协议调用。',
+            description: '以下使用 config.toml 与 auth.json 配置。Provider Base URL 直接填本站基础地址，协议使用 Responses；本项目同时兼容 /responses 与 /v1/responses。',
             items: [
               '创建支持 Responses 且包含目标模型的分组 Key',
               '在 Key 列表选择 Codex CLI 或 WebSocket 配置',

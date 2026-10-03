@@ -96,6 +96,8 @@ describe('DocsGuideView', () => {
     expect(text).toContain('wire_api = "responses"')
     expect(text).toContain('supports_websockets = false')
     expect(text).toContain('cli_auth_credentials_store = "file"')
+    expect(wrapper.get('[data-snippet="codex-config"] code').text()).toContain('base_url = "https://gateway.example.com"')
+    expect(wrapper.get('[data-snippet="codex-config"] code').text()).not.toContain('base_url = "https://gateway.example.com/v1"')
     expect(text).not.toContain('windows_wsl_setup_acknowledged')
     expect(text).not.toContain('/v1beta')
     expect(text).not.toContain('/antigravity')

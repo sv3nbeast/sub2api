@@ -36,6 +36,8 @@ Anthropic 官方 [网关接入说明](https://code.claude.com/docs/en/llm-gatewa
 
 公共 Codex 示例保持 Responses，采用 HTTP/SSE 基线，将凭证存储显式设为 `file`，与旁边的 auth.json 教程一致。去掉无关的旧网络/WSL/功能开关，保留动态推荐模型和 reasoning effort。需要模型目录、分组模板或 WebSocket 时，引导使用实际 Key 的生成器。依据：[配置参考](https://developers.openai.com/codex/config-reference)、[认证说明](https://developers.openai.com/codex/auth)。未调整控制台生成器或客户端已有配置。
 
+补充核验：`backend/internal/server/routes/gateway.go` 已注册根路径 `/responses` 与 `/models` 别名，共用认证和模型权限中间件。Codex 文档 Base URL 因此改为站点根地址，保留 `/v1` 的兼容说明。接口表新增“完整请求地址与 Base URL 不同”的明确提示；cURL 继续使用完整接口路径。此处以本项目路由事实为依据，没有新增或修改网关路由。
+
 ## 验证结果
 
 - 4 个测试文件、**17 项测试全部通过**：配置与协议联动、复制失败状态、锚点、JSON 请求结构、真实 Bash 解析、i18n key 完整性和消息编译。

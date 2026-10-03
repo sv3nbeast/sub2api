@@ -113,6 +113,7 @@
 
             <section id="endpoint-map" class="docs-section scroll-mt-24">
               <SectionHeading :eyebrow="t('docsGuide.examples.eyebrow')" :title="t('docsGuide.examples.title')" :description="t('docsGuide.examples.description')" />
+              <p class="docs-callout">{{ t('docsGuide.examples.addressHint', { baseUrl: apiBaseUrl }) }}</p>
               <div class="docs-endpoint-table">
                 <div v-for="endpoint in endpoints" :key="endpoint.path"><span>{{ endpoint.name }}</span><code>{{ endpoint.path }}</code></div>
               </div>
@@ -341,7 +342,7 @@ const codexConfigExample = computed(() => {
   const lines = ['model_provider = "OpenAI"', `model = ${JSON.stringify(codexModel.value)}`, `review_model = ${JSON.stringify(codexReviewModel.value)}`,
     `model_reasoning_effort = ${JSON.stringify(usageConfig.value?.codex_reasoning_effort || 'xhigh')}`,
     'cli_auth_credentials_store = "file"', '', '[model_providers.OpenAI]', 'name = "OpenAI"',
-    `base_url = ${JSON.stringify(`${apiBaseUrl.value}/v1`)}`, 'wire_api = "responses"']
+    `base_url = ${JSON.stringify(apiBaseUrl.value)}`, 'wire_api = "responses"']
   // The public guide is the HTTP/SSE baseline. Group-specific WebSocket and
   // model-catalog settings are provided by the authenticated Use Key generator.
   lines.push('supports_websockets = false')

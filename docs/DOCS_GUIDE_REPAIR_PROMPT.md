@@ -18,6 +18,7 @@
 4. **协议与系统不匹配**：原页面只有 GPT Responses 示例，Windows 切换不影响 cURL。提供 Anthropic Messages、OpenAI Responses、Chat Completions 的准确请求体与认证头；统一系统选择，Windows 使用 PowerShell，Unix 使用 Bash / Zsh。模型 ID 来自配置但必须允许替换，并说明推荐值不保证该 Key 分组权限。
 5. **移动端缺少目录**：不能在隐藏桌面目录后失去全部章节导航。提供轻量、键盘可用的手机目录，锚点不能被顶部导航遮挡。
 6. **配置表述不准确**：不要宣称公共样例与“使用密钥”完全相同。实际生成器包含分组专用模板、额外配置和模型目录。通用 Codex 教程采用 HTTP / SSE；WebSocket 由用户选择对应模板。核对地址后缀、推荐模型、Windows 与 WSL 路径、CODEX_HOME 和凭证存储差异。
+   区分客户端 Base URL 与完整 HTTP 请求地址。本站 Codex 支持根路径 `/responses` / `/models`，其 Base URL 可直接使用根地址；不得误写成必须追加 `/v1`。cURL 仍使用完整接口地址，页面必须说明它不是 Base URL 配置值。
 7. **CLI / VS Code / Desktop 混淆**：按 Anthropic 官方说明分别给出配置位置。补充 VS Code `claudeCode.environmentVariables` 用户设置，解释为何只改 CLI 设置仍显示登录。桌面应用要写完整菜单路径，并明确本地 Code 会话范围。
 8. **交互反馈与无障碍**：复制失败不能显示成功。复制按钮和主题按钮使用当前语言和明确名称；代码可通过键盘滚动；系统选择使用正确原生语义；移动点击区域、焦点和减弱动态设置均须可用。
 

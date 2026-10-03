@@ -292,7 +292,7 @@ describe('UseKeyModal', () => {
     expect(config.provider.anthropic.models['claude-opus-5-thinking'].options.thinking).not.toHaveProperty('budgetTokens')
     // The generated config defaults both 5.5 families to adaptive without a
     // legacy budget. Sonnet 5.5 additionally supports between_tools on Claude.
-    for (const id of ['claude-opus-5-5', 'claude-opus-5-5-thinking', 'claude-sonnet-5-5', 'claude-sonnet-5-5-thinking']) {
+    for (const id of ['claude-opus-5-5', 'claude-opus-5-5-thinking', 'claude-sonnet-5-5']) {
       expect(config.provider.anthropic.models[id].limit).toEqual({ context: 1000000, output: 128000 })
       expect(config.provider.anthropic.models[id].options.thinking).toEqual({ type: 'adaptive' })
       expect(config.provider.anthropic.models[id].options.thinking).not.toHaveProperty('budgetTokens')
@@ -317,7 +317,6 @@ describe('UseKeyModal', () => {
     const models = JSON.parse(claudeConfig!).provider['antigravity-claude'].models
     expect(models['claude-sonnet-4-6']).toBeDefined()
     expect(models['claude-sonnet-5-5']).toBeUndefined()
-    expect(models['claude-sonnet-5-5-thinking']).toBeUndefined()
   })
 
   it('includes Claude Code default model in anthropic settings config', () => {

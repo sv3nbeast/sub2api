@@ -43,7 +43,6 @@ export const claudeModels = [
   'claude-fable-5-1',
   'claude-fable-5',
   'claude-sonnet-5-5',
-  'claude-sonnet-5-5-thinking',
   'claude-sonnet-5',
   'claude-sonnet-4-6',
   'claude-haiku-4-6',
@@ -104,7 +103,6 @@ const kiroModels = [
   'gpt-5.6-luna',
   'codex-auto-review',
   'claude-sonnet-5-5',
-  'claude-sonnet-5-5-thinking',
   'claude-sonnet-5',
   'claude-opus-5-5',
   'claude-opus-5-5-thinking',
@@ -350,7 +348,6 @@ const anthropicPresetMappings = [
   { label: 'Fable 5.1', from: 'claude-fable-5-1', to: 'claude-fable-5-1', color: 'bg-pink-100 text-pink-700 hover:bg-pink-200 dark:bg-pink-900/30 dark:text-pink-400' },
   { label: 'Fable 5', from: 'claude-fable-5', to: 'claude-fable-5', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-400' },
   { label: 'Sonnet 5.5', from: 'claude-sonnet-5-5', to: 'claude-sonnet-5-5', color: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400' },
-  { label: 'Sonnet 5.5 Thinking', from: 'claude-sonnet-5-5-thinking', to: 'claude-sonnet-5-5', color: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400' },
   { label: 'Sonnet 5', from: 'claude-sonnet-5', to: 'claude-sonnet-5', color: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400' },
   { label: 'Opus 5.5', from: 'claude-opus-5-5', to: 'claude-opus-5-5', color: 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400' },
   { label: 'Opus 5', from: 'claude-opus-5', to: 'claude-opus-5', color: 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400' },
@@ -463,7 +460,6 @@ const antigravityPresetMappings = [
 const kiroPresetMappings = [
   { label: 'Codex Auto Review→Luna', from: 'codex-auto-review', to: 'gpt-5.6-luna', color: 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300' },
   { label: 'Sonnet 5.5', from: 'claude-sonnet-5-5', to: 'claude-sonnet-5.5', color: 'bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-300' },
-  { label: 'Sonnet 5.5 Thinking', from: 'claude-sonnet-5-5-thinking', to: 'claude-sonnet-5.5', color: 'bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-300' },
   { label: 'Sonnet 5', from: 'claude-sonnet-5', to: 'claude-sonnet-5', color: 'bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-300' },
   // Kiro 的上游 ID 带点号（与 Opus 4.8 同规则；Opus 5 例外，无小版本号）。
   { label: 'Opus 5.5', from: 'claude-opus-5-5', to: 'claude-opus-5.5', color: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300' },

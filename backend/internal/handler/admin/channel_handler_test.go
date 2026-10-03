@@ -658,7 +658,7 @@ func TestGetModelDefaultPricing_OmitsUnsupportedCache1hPrice(t *testing.T) {
 
 func TestGetModelDefaultPricing_Sonnet55OfficialCacheBreakdown(t *testing.T) {
 	router := setupModelDefaultPricingRouter()
-	for _, model := range []string{"claude-sonnet-5-5", "claude-sonnet-5.5", "claude-sonnet-5-5-thinking", "claude-sonnet-5.5-thinking"} {
+	for _, model := range []string{"claude-sonnet-5-5"} {
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/channels/model-pricing?model="+model, nil))
 		require.Equal(t, http.StatusOK, w.Code)

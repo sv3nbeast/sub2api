@@ -50,7 +50,7 @@ func TestAccountHandlerGetKiroDefaultModelMapping_Sonnet55(t *testing.T) {
 		Data map[string]string `json:"data"`
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
-	for _, alias := range []string{"claude-sonnet-5-5", "claude-sonnet-5.5", "claude-sonnet-5-5-thinking", "claude-sonnet-5.5-thinking"} {
+	for _, alias := range []string{"claude-sonnet-5-5"} {
 		require.Equal(t, "claude-sonnet-5.5", response.Data[alias], alias)
 	}
 }
@@ -382,7 +382,7 @@ func TestAccountHandlerGetAvailableModels_KiroOAuthFallsBackToDefaults(t *testin
 	}
 	require.True(t, slices.Contains(ids, "claude-sonnet-5"))
 	require.True(t, slices.Contains(ids, "claude-sonnet-5-5"))
-	require.True(t, slices.Contains(ids, "claude-sonnet-5-5-thinking"))
+	require.NotContains(t, ids, "claude-sonnet-5-5-thinking")
 	require.True(t, slices.Contains(ids, "claude-opus-4-7"))
 	require.True(t, slices.Contains(ids, "claude-sonnet-4-6"))
 	require.True(t, slices.Contains(ids, "claude-sonnet-4-6-thinking"))

@@ -30,7 +30,7 @@ describe('useModelWhitelist', () => {
   })
 
   it('exposes Sonnet 5.5 only on verified Claude and Kiro providers', () => {
-    for (const model of ['claude-sonnet-5-5', 'claude-sonnet-5-5-thinking']) {
+    for (const model of ['claude-sonnet-5-5']) {
       for (const platform of ['claude', 'kiro']) {
         expect(getModelsByPlatform(platform)).toContain(model)
         expect(getPresetMappingsByPlatform(platform)).toEqual(expect.arrayContaining([
@@ -48,7 +48,6 @@ describe('useModelWhitelist', () => {
     const mappings = await fetchKiroDefaultMappings()
     expect(mappings).toEqual(expect.arrayContaining([
       { from: 'claude-sonnet-5-5', to: 'claude-sonnet-5.5' },
-      { from: 'claude-sonnet-5-5-thinking', to: 'claude-sonnet-5.5' }
     ]))
     mappings[0].to = 'mutated'
     expect((await fetchKiroDefaultMappings())[0].to).not.toBe('mutated')

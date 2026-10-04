@@ -822,7 +822,9 @@ function finalizeNav(items: NavItem[]): NavItem[] {
 }
 
 // User navigation items (for regular users)
-const userNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems(true)))
+const userNavItems = computed((): NavItem[] =>
+  finalizeNav(buildSelfNavItems(true).filter(item => item.path !== '/rankings')),
+)
 
 const userNavSections = computed<NavSection[]>(() => {
   const items = userNavItems.value
@@ -837,7 +839,7 @@ const userNavSections = computed<NavSection[]>(() => {
     {
       key: 'models',
       title: t('nav.sectionModels'),
-      items: bucket(['/available-channels', '/rankings', '/channel-status']),
+      items: bucket(['/available-channels', '/channel-status']),
     },
     {
       key: 'billing',
@@ -858,7 +860,6 @@ const userNavSections = computed<NavSection[]>(() => {
           '/keys',
           '/usage',
           '/available-channels',
-          '/rankings',
           '/channel-status',
           '/subscriptions',
           '/purchase',
